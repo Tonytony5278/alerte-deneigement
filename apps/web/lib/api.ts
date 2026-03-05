@@ -41,14 +41,23 @@ export async function getCities(): Promise<CityConfig[]> {
   return json.data;
 }
 
-export async function searchStreets(q: string, cityId = 'montreal', limit = 8): Promise<StreetResult[]> {
-  const res = await fetch(
-    `${API_BASE}/api/streets/search?q=${encodeURIComponent(q)}&cityId=${encodeURIComponent(cityId)}&limit=${limit}`,
-    { cache: 'no-store' }
-  );
-  if (!res.ok) return [];
-  const json = await res.json() as { data: StreetResult[] };
-  return json.data;
+export interface SearchResult {
+  data: StreetResult[];
+  error?: string;
+}
+
+export async function searchStreets(q: string, cityId = 'montreal', limit = 8): Promise<SearchResult> {
+  try {
+    const res = await fetch(
+      `${API_BASE}/api/streets/search?q=${encodeURIComponent(q)}&cityId=${encodeURIComponent(cityId)}&limit=${limit}`,
+      { cache: 'no-store' }
+    );
+    if (!res.ok) return { data: [], error: `Erreur serveur (${res.status})` };
+    const json = await res.json() as { data: StreetResult[] };
+    return { data: json.data };
+  } catch {
+    return { data: [], error: 'Impossible de joindre le serveur. Réessaie dans quelques instants.' };
+  }
 }
 
 export async function getStreet(id: string): Promise<StreetResult | null> {

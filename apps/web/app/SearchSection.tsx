@@ -4,21 +4,32 @@ import { useState, useRef, useCallback } from 'react';
 import Link from 'next/link';
 import { searchStreets, STATUS_META, type CityConfig, type StreetResult } from '@/lib/api';
 
+const DEFAULT_CITIES: CityConfig[] = [
+  { id: 'montreal', name: 'Montréal', nameShort: 'MTL', available: true },
+  { id: 'longueuil', name: 'Longueuil / Brossard', nameShort: 'LGL', available: true },
+  { id: 'laval', name: 'Laval', nameShort: 'LAV', available: true },
+  { id: 'quebec', name: 'Québec', nameShort: 'QC', available: true },
+  { id: 'gatineau', name: 'Gatineau', nameShort: 'GAT', available: true },
+];
+
 interface Props {
   cities: CityConfig[];
 }
 
 export function SearchSection({ cities }: Props) {
-  const availableCities = cities.filter((c) => c.available);
+  const effectiveCities = cities.length > 0 ? cities : DEFAULT_CITIES;
+  const availableCities = effectiveCities.filter((c) => c.available);
   const [cityId, setCityId] = useState(availableCities[0]?.id ?? 'montreal');
   const [query, setQuery] = useState('');
   const [results, setResults] = useState<StreetResult[]>([]);
   const [loading, setLoading] = useState(false);
   const [searched, setSearched] = useState(false);
+  const [error, setError] = useState<string | null>(null);
   const timerRef = useRef<ReturnType<typeof setTimeout>>();
 
   const handleChange = useCallback((text: string) => {
     setQuery(text);
+    setError(null);
     clearTimeout(timerRef.current);
     if (text.length < 2) {
       setResults([]);
@@ -28,8 +39,9 @@ export function SearchSection({ cities }: Props) {
     timerRef.current = setTimeout(async () => {
       setLoading(true);
       try {
-        const data = await searchStreets(text, cityId, 8);
-        setResults(data);
+        const result = await searchStreets(text, cityId, 8);
+        setResults(result.data);
+        setError(result.error ?? null);
         setSearched(true);
       } finally {
         setLoading(false);
@@ -39,13 +51,15 @@ export function SearchSection({ cities }: Props) {
 
   const handleCityChange = (id: string) => {
     setCityId(id);
+    setError(null);
     if (query.length >= 2) {
       clearTimeout(timerRef.current);
       timerRef.current = setTimeout(async () => {
         setLoading(true);
         try {
-          const data = await searchStreets(query, id, 8);
-          setResults(data);
+          const result = await searchStreets(query, id, 8);
+          setResults(result.data);
+          setError(result.error ?? null);
           setSearched(true);
         } finally {
           setLoading(false);
@@ -129,7 +143,13 @@ export function SearchSection({ cities }: Props) {
         </ul>
       )}
 
-      {searched && results.length === 0 && !loading && (
+      {error && (
+        <div className="text-center text-sm text-red-600 bg-red-50 border border-red-200 rounded-xl px-4 py-3">
+          {error}
+        </div>
+      )}
+
+      {searched && results.length === 0 && !loading && !error && (
         <p className="text-center text-sm text-gray-400">Aucun résultat pour « {query} ».</p>
       )}
     </div>

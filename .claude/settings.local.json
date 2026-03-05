@@ -51,7 +51,14 @@
       "mcp__playwright__browser_wait_for",
       "mcp__playwright__browser_run_code",
       "Bash(rm:*)",
-      "Bash(ls:*)"
+      "Bash(ls:*)",
+      "Bash(gh repo:*)",
+      "WebFetch(domain:alertneige.app)",
+      "WebFetch(domain:api.alertneige.app)",
+      "Bash(npm install:*)",
+      "Bash(npx next:*)",
+      "Bash(npm run:*)",
+      "Bash(timeout 15 npx tsx:*)"
     ]
   }
 }

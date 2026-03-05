@@ -42,7 +42,7 @@ export const config = {
   // No token needed for Expo Push API — it's public
 
   // CORS
-  allowedOrigins: optional('ALLOWED_ORIGINS', 'http://localhost:8081,http://localhost:19006').split(','),
+  allowedOrigins: optional('ALLOWED_ORIGINS', 'https://alertneige.app,https://www.alertneige.app,http://localhost:3001,http://localhost:8081,http://localhost:19006').split(','),
 
   // Rate limiting
   rateLimit: {

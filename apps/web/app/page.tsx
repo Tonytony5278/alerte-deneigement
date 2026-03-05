@@ -1,4 +1,4 @@
-import { getCities } from '@/lib/api';
+import { getCities, type CityConfig } from '@/lib/api';
 import { SearchSection } from './SearchSection';
 
 const FEATURES = [
@@ -8,8 +8,18 @@ const FEATURES = [
   { icon: '🌎', title: '5 villes couvertes', desc: "Montréal, Longueuil, Laval, Québec et Gatineau. Sherbrooke bientôt." },
 ];
 
+const FALLBACK_CITIES: CityConfig[] = [
+  { id: 'montreal', name: 'Montréal', nameShort: 'MTL', available: true },
+  { id: 'longueuil', name: 'Longueuil / Brossard', nameShort: 'LGL', available: true },
+  { id: 'laval', name: 'Laval', nameShort: 'LAV', available: true },
+  { id: 'quebec', name: 'Québec', nameShort: 'QC', available: true },
+  { id: 'gatineau', name: 'Gatineau', nameShort: 'GAT', available: true },
+  { id: 'sherbrooke', name: 'Sherbrooke', nameShort: 'SHE', available: false },
+];
+
 export default async function HomePage() {
-  const cities = await getCities().catch(() => []);
+  const fetched = await getCities().catch(() => []);
+  const cities = fetched.length > 0 ? fetched : FALLBACK_CITIES;
 
   return (
     <>

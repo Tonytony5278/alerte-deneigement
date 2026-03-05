@@ -65,26 +65,45 @@ async function poll() {
     console.log(`[Poller] Done: ${totalRecords} total, ${totalChanged} changed`);
 
     if (allChangedIds.length > 0) {
-      const statusRows = db
-        .prepare(
-          `SELECT segment_id, etat FROM operation_statuses WHERE segment_id IN (${allChangedIds.map(() => '?').join(',')})`
-        )
-        .all(...allChangedIds) as Array<{ segment_id: string; etat: number }>;
-
-      await Promise.all(
-        statusRows.map((row) =>
-          notifyStatusChange(row.segment_id, row.etat).catch((err) =>
-            console.error(`[Poller] Notification error for ${row.segment_id}:`, err)
+      // Batch in chunks of 500 to stay under SQLite's 999 variable limit
+      const CHUNK = 500;
+      const statusRows: Array<{ segment_id: string; etat: number }> = [];
+      for (let i = 0; i < allChangedIds.length; i += CHUNK) {
+        const chunk = allChangedIds.slice(i, i + CHUNK);
+        const rows = db
+          .prepare(
+            `SELECT segment_id, etat FROM operation_statuses WHERE segment_id IN (${chunk.map(() => '?').join(',')})`
           )
-        )
+          .all(...chunk) as Array<{ segment_id: string; etat: number }>;
+        statusRows.push(...rows);
+      }
+
+      // Only notify for segments that have active watchers (skip if none)
+      const watchedIds = new Set(
+        (db.prepare('SELECT DISTINCT segment_id FROM user_watches').all() as Array<{ segment_id: string }>)
+          .map((r) => r.segment_id)
       );
+      const toNotify = statusRows.filter((r) => watchedIds.has(r.segment_id));
+
+      if (toNotify.length > 0) {
+        console.log(`[Poller] Notifying ${toNotify.length} watched segments (of ${statusRows.length} changed)`);
+        await Promise.all(
+          toNotify.map((row) =>
+            notifyStatusChange(row.segment_id, row.etat).catch((err) =>
+              console.error(`[Poller] Notification error for ${row.segment_id}:`, err)
+            )
+          )
+        );
+      }
     }
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);
     console.error('[Poller] Fatal error:', msg);
-    db.prepare(
-      'INSERT INTO data_sync_log (id, synced_at, status, error_message) VALUES (?, ?, ?, ?)'
-    ).run(syncId, new Date().toISOString(), 'error', msg);
+    try {
+      db.prepare(
+        'INSERT OR REPLACE INTO data_sync_log (id, synced_at, status, error_message) VALUES (?, ?, ?, ?)'
+      ).run(syncId, new Date().toISOString(), 'error', msg);
+    } catch { /* ignore logging failure */ }
   } finally {
     isPolling = false;
   }
