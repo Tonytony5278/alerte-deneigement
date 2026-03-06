@@ -1,0 +1,88 @@
+name: Deploy Web
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'apps/web/**'
+      - '.github/workflows/deploy-web.yml'
+  workflow_dispatch:
+
+jobs:
+  build:
+    name: Build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build Next.js
+        env:
+          NEXT_PUBLIC_API_URL: https://api.alerteneige.app
+        run: npm run build --workspace=apps/web
+
+      - name: Create deployment package
+        run: |
+          mkdir -p /tmp/deploy
+          # Standalone output in monorepo nests under apps/web/
+          if [ -d apps/web/.next/standalone/apps/web ]; then
+            cp -r apps/web/.next/standalone/apps/web/* /tmp/deploy/
+            # Copy shared node_modules from standalone root
+            cp -r apps/web/.next/standalone/node_modules /tmp/deploy/node_modules 2>/dev/null || true
+          else
+            cp -r apps/web/.next/standalone/* /tmp/deploy/
+          fi
+          mkdir -p /tmp/deploy/.next
+          cp -r apps/web/.next/static /tmp/deploy/.next/static
+          cp -r apps/web/public /tmp/deploy/public 2>/dev/null || true
+          cd /tmp/deploy
+          zip -r $GITHUB_WORKSPACE/deploy.zip .
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: web-deploy-zip
+          path: deploy.zip
+          retention-days: 1
+
+  deploy:
+    name: Deploy to Azure
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: web-deploy-zip
+
+      - name: Login to Azure
+        uses: azure/login@v2
+        with:
+          creds: ${{ secrets.AZURE_CREDENTIALS }}
+
+      - name: Deploy to Azure Web App
+        run: |
+          az webapp deploy \
+            --name alerte-neige-web \
+            --resource-group alerte-neige-rg \
+            --src-path deploy.zip \
+            --type zip \
+            --timeout 300
+
+      - name: Health check
+        run: |
+          sleep 30
+          for i in 1 2 3 4 5; do
+            if curl -sf https://alerteneige.app > /dev/null; then
+              echo "Web app is healthy!"
+              exit 0
+            fi
+            echo "Attempt $i failed, waiting 30s..."
+            sleep 30
+          done
+          echo "Health check failed after 5 attempts"
+          exit 1

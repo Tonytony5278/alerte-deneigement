@@ -2,7 +2,7 @@
 const nextConfig = {
   output: 'standalone',
   env: {
-    NEXT_PUBLIC_API_URL: process.env.NEXT_PUBLIC_API_URL ?? 'https://api.alertneige.app',
+    NEXT_PUBLIC_API_URL: process.env.NEXT_PUBLIC_API_URL ?? 'https://api.alerteneige.app',
   },
 };
 
