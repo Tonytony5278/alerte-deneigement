@@ -9,44 +9,52 @@ on:
   workflow_dispatch:
 
 jobs:
-  deploy:
-    name: Build & Deploy to Azure
+  build:
+    name: Build
     runs-on: ubuntu-latest
-    # Use Debian Bookworm container to match Azure App Service's glibc
+    # Use Debian Bookworm to match Azure App Service's glibc
     container: node:22-bookworm
     steps:
       - uses: actions/checkout@v4
 
-      # Install at repo root (npm workspaces)
-      - name: Install all workspace dependencies
+      - name: Install workspace dependencies
         run: npm ci
 
-      # Build the API workspace
       - name: Build API
         run: npm run build --workspace=services/api
 
-      # Create a standalone deploy package outside workspace context
       - name: Create deployment package
         run: |
-          apt-get update && apt-get install -y zip
+          apt-get update -qq && apt-get install -y -qq zip > /dev/null
           mkdir -p /tmp/deploy
           cp services/api/package.json /tmp/deploy/
           cp -r services/api/dist /tmp/deploy/dist
           cd /tmp/deploy
           npm install --omit=dev
-          echo "=== Checking better-sqlite3 native addon ==="
-          ls -la node_modules/better-sqlite3/build/Release/
           node -e "const db = require('better-sqlite3')(':memory:'); console.log('better-sqlite3 OK'); db.close()"
           zip -r $GITHUB_WORKSPACE/deploy.zip package.json dist/ node_modules/
-          echo "=== Zip size ==="
-          ls -lh $GITHUB_WORKSPACE/deploy.zip
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: deploy-zip
+          path: deploy.zip
+          retention-days: 1
+
+  deploy:
+    name: Deploy to Azure
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: deploy-zip
 
       - name: Login to Azure
         uses: azure/login@v2
         with:
           creds: ${{ secrets.AZURE_CREDENTIALS }}
 
-      - name: Deploy pre-built zip to Azure
+      - name: Deploy to Azure Web App
         run: |
           az webapp deploy \
             --name alerte-neige-api \
