@@ -1,6 +1,6 @@
 import cron from 'node-cron';
 import { config } from '../config';
-import { syncCity, syncGeobase } from '../services/dataFetcher';
+import { syncCity, syncGeobase, syncGeobaseGeometry } from '../services/dataFetcher';
 import { notifyStatusChange, notifyScheduledReminders } from '../services/notificationService';
 import { CITY_ADAPTERS } from '../services/cityRegistry';
 import { getDb } from '../db';
@@ -124,6 +124,8 @@ async function initGeobase() {
   try {
     console.log('[Geobase] Syncing Montreal street names...');
     await syncGeobase();
+    console.log('[Geobase] Syncing geometry...');
+    await syncGeobaseGeometry();
     geobaseSynced = true;
     console.log('[Geobase] Done');
   } catch (err) {

@@ -84,19 +84,23 @@ export class GatineauAdapter implements CityAdapter {
       const stateId = operationHash?.state;
       const status = stateId ? (STATE_TO_UNIFIED[stateId] ?? UnifiedStatus.UNKNOWN) : UnifiedStatus.UNKNOWN;
 
-      // Extract centroid from geometry
+      // Extract centroid and full geometry
       let lat: number | null = null;
       let lng: number | null = null;
+      let geometry: number[][] | null = null;
 
       if (f.geometry?.type === 'LineString') {
         const coords = f.geometry.coordinates as number[][];
         if (coords?.length > 0) {
+          geometry = coords.map(([x, y]) => [x, y]);
           const mid = coords[Math.floor(coords.length / 2)];
           [lng, lat] = mid;
         }
       } else if (f.geometry?.type === 'MultiLineString') {
         const lines = f.geometry.coordinates as number[][][];
         if (lines?.length > 0 && lines[0].length > 0) {
+          // Flatten all lines into one polyline
+          geometry = lines.flat().map(([x, y]) => [x, y]);
           const mid = lines[0][Math.floor(lines[0].length / 2)];
           [lng, lat] = mid;
         }
@@ -114,6 +118,7 @@ export class GatineauAdapter implements CityAdapter {
         status,
         planifStart: null,
         planifEnd: null,
+        geometry,
       });
     }
 

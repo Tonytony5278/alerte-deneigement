@@ -58,11 +58,14 @@ export class LongueuilAdapter implements CityAdapter {
       const objectId = String(attrs['OBJECTID'] ?? attrs['ID_GPS'] ?? '');
       if (!objectId) continue;
 
-      // Extract first point of first path as representative coordinate
+      // Extract midpoint and full path geometry
       let lat: number | null = null;
       let lng: number | null = null;
+      let geometry: number[][] | null = null;
       const paths = f.geometry?.paths;
       if (paths && paths.length > 0 && paths[0].length > 0) {
+        // Store full path as [lng, lat] pairs
+        geometry = paths[0].map(([x, y]) => [x, y]);
         const midIdx = Math.floor(paths[0].length / 2);
         [lng, lat] = paths[0][midIdx] as [number, number];
       }
@@ -81,6 +84,7 @@ export class LongueuilAdapter implements CityAdapter {
         status: statutToUnified(statut),
         planifStart: dtTassement ? new Date(dtTassement as number).toISOString() : null,
         planifEnd: null,
+        geometry,
       });
     }
 

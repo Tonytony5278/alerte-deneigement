@@ -126,6 +126,31 @@ export async function getStreetStatus(segmentId: string): Promise<StreetResult['
   return data.data.etat;
 }
 
+// --- Map ---
+
+export interface MapSegment {
+  id: string;
+  nom_voie: string;
+  cote: string | null;
+  lat: number;
+  lng: number;
+  etat: number;
+  etat_label: string;
+  date_deb_planif: string | null;
+  /** Polyline coordinates [[lng, lat], ...] or null for point-only segments */
+  geometry: number[][] | null;
+}
+
+export async function getMapSegments(
+  minLat: number, maxLat: number, minLng: number, maxLng: number,
+  cityId = 'montreal', limit = 2000,
+): Promise<MapSegment[]> {
+  const data = await apiFetch<{ data: MapSegment[] }>(
+    `/api/streets/map?minLat=${minLat}&maxLat=${maxLat}&minLng=${minLng}&maxLng=${maxLng}&cityId=${encodeURIComponent(cityId)}&limit=${limit}`
+  );
+  return data.data;
+}
+
 // --- Watches ---
 
 export async function createWatch(payload: {

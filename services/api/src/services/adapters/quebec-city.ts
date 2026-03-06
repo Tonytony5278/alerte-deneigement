@@ -60,14 +60,24 @@ export class QuebecCityAdapter implements CityAdapter {
       const code = attrs['CODE'] ?? attrs['OBJECTID'];
       if (code == null) continue;
 
-      // Centroid of first ring
+      // Centroid and polygon geometry
       let lat: number | null = null;
       let lng: number | null = null;
+      let geometry: number[][] | null = null;
       const rings = f.geometry?.rings;
       if (rings && rings.length > 0 && rings[0].length > 0) {
         const pts = rings[0];
-        const midIdx = Math.floor(pts.length / 2);
-        [lng, lat] = pts[midIdx] as [number, number];
+        // Store polygon outline as polyline (closing loop)
+        geometry = pts.map(([x, y]) => [x, y]);
+        // Compute centroid
+        let sumLat = 0;
+        let sumLng = 0;
+        for (const [x, y] of pts) {
+          sumLng += x;
+          sumLat += y;
+        }
+        lng = sumLng / pts.length;
+        lat = sumLat / pts.length;
       }
 
       const nom = attrs['NOM'];
@@ -82,6 +92,7 @@ export class QuebecCityAdapter implements CityAdapter {
         status: statutToUnified(statut),
         planifStart: null,
         planifEnd: null,
+        geometry,
       });
     }
 

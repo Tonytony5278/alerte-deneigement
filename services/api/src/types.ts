@@ -34,6 +34,8 @@ export interface NormalizedSegment {
   status: UnifiedStatus;
   planifStart: string | null;
   planifEnd: string | null;
+  /** Polyline geometry: array of [lng, lat] coordinate pairs (GeoJSON order) */
+  geometry?: number[][] | null;
 }
 
 // ─── Montreal-specific (legacy) ────────────────────────────────────────────

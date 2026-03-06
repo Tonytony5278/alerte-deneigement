@@ -191,6 +191,54 @@ export async function syncGeobase(): Promise<void> {
 }
 
 /**
+ * Enriches Montreal street segments with polyline geometry from a configurable source.
+ * Expected format: JSON object mapping cote_rue_id → [[lng, lat], ...]
+ */
+export async function syncGeobaseGeometry(): Promise<void> {
+  if (!config.geobaseGeometryUrl) return;
+
+  const db = getDb();
+  const res = await fetch(config.geobaseGeometryUrl, {
+    headers: { 'User-Agent': 'AlerteDeneigement/1.0' },
+    signal: AbortSignal.timeout(60_000),
+  });
+
+  if (!res.ok) {
+    throw new Error(`Geobase geometry API responded ${res.status}`);
+  }
+
+  const geoMap = (await res.json()) as Record<string, number[][] | { coordinates: number[][] }>;
+
+  const updateGeometry = db.prepare(`
+    UPDATE street_segments
+    SET geometry = @geometry,
+        lat = COALESCE(lat, @lat),
+        lng = COALESCE(lng, @lng)
+    WHERE id = @id
+  `);
+
+  const enrich = db.transaction(() => {
+    for (const [id, value] of Object.entries(geoMap)) {
+      const coords = Array.isArray(value) ? value : value.coordinates;
+      if (!coords || coords.length === 0) continue;
+
+      // Compute centroid for lat/lng
+      const midIdx = Math.floor(coords.length / 2);
+      const [lng, lat] = coords[midIdx];
+
+      updateGeometry.run({
+        id,
+        geometry: JSON.stringify(coords),
+        lat,
+        lng,
+      });
+    }
+  });
+
+  enrich();
+}
+
+/**
  * Generic city sync: fetches NormalizedSegments from an adapter and upserts them into DB.
  * Returns changed segment DB IDs for notification dispatch.
  */
@@ -203,12 +251,13 @@ export async function syncCity(adapter: CityAdapter): Promise<{ result: SyncResu
   }
 
   const upsertSegment = db.prepare(`
-    INSERT INTO street_segments (id, city_id, nom_voie, lat, lng, created_at)
-    VALUES (@id, @city_id, @nom_voie, @lat, @lng, datetime('now'))
+    INSERT INTO street_segments (id, city_id, nom_voie, lat, lng, geometry, created_at)
+    VALUES (@id, @city_id, @nom_voie, @lat, @lng, @geometry, datetime('now'))
     ON CONFLICT(id) DO UPDATE SET
       nom_voie = CASE WHEN excluded.nom_voie != id THEN excluded.nom_voie ELSE street_segments.nom_voie END,
       lat      = COALESCE(excluded.lat, street_segments.lat),
-      lng      = COALESCE(excluded.lng, street_segments.lng)
+      lng      = COALESCE(excluded.lng, street_segments.lng),
+      geometry = COALESCE(excluded.geometry, street_segments.geometry)
   `);
 
   const upsertStatus = db.prepare(`
@@ -242,7 +291,14 @@ export async function syncCity(adapter: CityAdapter): Promise<{ result: SyncResu
         const existing = getExisting.get(dbId) as { etat: number } | undefined;
         const hasChanged = !existing || existing.etat !== seg.status;
 
-        upsertSegment.run({ id: dbId, city_id: seg.cityId, nom_voie: seg.nomVoie, lat: seg.lat, lng: seg.lng });
+        upsertSegment.run({
+          id: dbId,
+          city_id: seg.cityId,
+          nom_voie: seg.nomVoie,
+          lat: seg.lat,
+          lng: seg.lng,
+          geometry: seg.geometry ? JSON.stringify(seg.geometry) : null,
+        });
 
         const info = upsertStatus.run({
           segment_id: dbId,

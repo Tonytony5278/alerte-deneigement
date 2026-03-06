@@ -26,6 +26,8 @@ export const config = {
     'GEOBASE_MAP_URL',
     'https://raw.githubusercontent.com/ludodefgh/planif-neige-public-api/main/data/geobase-map.json'
   ),
+  // Optional: JSON mapping cote_rue_id → [[lng, lat], ...] for Montreal polyline geometry
+  geobaseGeometryUrl: optional('GEOBASE_GEOMETRY_URL', ''),
 
   // Official SOAP API (optional — requires token from Ville de MTL)
   officialApiToken: optional('PLANIF_NEIGE_TOKEN', ''),

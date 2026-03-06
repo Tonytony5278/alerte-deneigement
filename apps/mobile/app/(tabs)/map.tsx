@@ -1,14 +1,14 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import {
   View, Text, TouchableOpacity, StyleSheet, ActivityIndicator, useColorScheme,
 } from 'react-native';
-import MapView, { Marker, Callout, type Region } from 'react-native-maps';
+import MapView, { Marker, Polyline, Callout, type Region } from 'react-native-maps';
 import * as Location from 'expo-location';
 import { router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 
 import { COLORS, BRAND, SPACING, FONT_SIZE, RADIUS } from '@/constants/colors';
-import { getNearbyStreets, type StreetResult } from '@/services/api';
+import { getMapSegments, type MapSegment } from '@/services/api';
 import { useSettingsStore } from '@/stores/settingsStore';
 import { getStatusColor } from '@/constants/colors';
 
@@ -22,18 +22,39 @@ const CITY_CENTERS: Record<string, { latitude: number; longitude: number }> = {
 
 const DEFAULT_DELTA = { latitudeDelta: 0.015, longitudeDelta: 0.015 };
 
+// Status colors for polylines (more vibrant for visibility on map)
+const POLYLINE_COLORS: Record<number, string> = {
+  0: '#9CA3AF', // Unknown — grey
+  1: '#9CA3AF', // Normal — grey
+  2: '#F97316', // Scheduled — orange
+  3: '#EF4444', // In progress — red
+  4: '#22C55E', // Completed — green
+  5: '#EAB308', // Restricted — yellow
+};
+
+function getPolylineColor(etat: number): string {
+  return POLYLINE_COLORS[etat] ?? '#9CA3AF';
+}
+
+// Convert [[lng, lat], ...] → [{latitude, longitude}, ...]
+function toLatLngs(geometry: number[][]): Array<{ latitude: number; longitude: number }> {
+  return geometry.map(([lng, lat]) => ({ latitude: lat, longitude: lng }));
+}
+
 export default function MapScreen() {
   const scheme = useColorScheme() ?? 'light';
   const C = COLORS[scheme];
   const { cityId } = useSettingsStore();
 
   const [location, setLocation] = useState<{ latitude: number; longitude: number } | null>(null);
-  const [streets, setStreets] = useState<StreetResult[]>([]);
+  const [segments, setSegments] = useState<MapSegment[]>([]);
   const [loading, setLoading] = useState(false);
   const [ready, setReady] = useState(false);
+  const [segmentCount, setSegmentCount] = useState(0);
 
   const mapRef = useRef<MapView>(null);
   const fetchTimer = useRef<ReturnType<typeof setTimeout>>();
+  const currentRegion = useRef<Region | null>(null);
 
   useEffect(() => {
     void init();
@@ -49,21 +70,32 @@ export default function MapScreen() {
         const coords = { latitude: pos.coords.latitude, longitude: pos.coords.longitude };
         setLocation(coords);
         setReady(true);
-        await loadStreets(coords.latitude, coords.longitude);
+        const initialRegion = { ...coords, ...DEFAULT_DELTA };
+        currentRegion.current = initialRegion;
+        await loadSegments(initialRegion);
         return;
       } catch {
         // fall through to city center
       }
     }
     setReady(true);
-    await loadStreets(center.latitude, center.longitude);
+    const fallbackRegion = { ...center, ...DEFAULT_DELTA };
+    currentRegion.current = fallbackRegion;
+    await loadSegments(fallbackRegion);
   }
 
-  async function loadStreets(lat: number, lng: number) {
+  async function loadSegments(region: Region) {
     setLoading(true);
     try {
-      const results = await getNearbyStreets(lat, lng, cityId, 600);
-      setStreets(results.filter((s) => s.lat !== null && s.lng !== null).slice(0, 80));
+      const { latitude, longitude, latitudeDelta, longitudeDelta } = region;
+      const minLat = latitude - latitudeDelta / 2;
+      const maxLat = latitude + latitudeDelta / 2;
+      const minLng = longitude - longitudeDelta / 2;
+      const maxLng = longitude + longitudeDelta / 2;
+
+      const data = await getMapSegments(minLat, maxLat, minLng, maxLng, cityId, 2000);
+      setSegments(data);
+      setSegmentCount(data.length);
     } catch {
       // silently ignore — map still shows
     } finally {
@@ -71,12 +103,13 @@ export default function MapScreen() {
     }
   }
 
-  function handleRegionChangeComplete(r: Region) {
+  const handleRegionChangeComplete = useCallback((r: Region) => {
+    currentRegion.current = r;
     clearTimeout(fetchTimer.current);
     fetchTimer.current = setTimeout(() => {
-      void loadStreets(r.latitude, r.longitude);
-    }, 800);
-  }
+      void loadSegments(r);
+    }, 600);
+  }, [cityId]);
 
   function goToMyLocation() {
     if (!location || !mapRef.current) return;
@@ -96,6 +129,10 @@ export default function MapScreen() {
     ...DEFAULT_DELTA,
   };
 
+  // Split segments into polylines (have geometry) and markers (point only)
+  const polylineSegments = segments.filter((s) => s.geometry && s.geometry.length >= 2);
+  const markerSegments = segments.filter((s) => !s.geometry || s.geometry.length < 2);
+
   return (
     <View style={styles.container}>
       <MapView
@@ -106,20 +143,33 @@ export default function MapScreen() {
         showsUserLocation
         showsMyLocationButton={false}
       >
-        {streets.map((street) => {
-          const color = getStatusColor(street.etat ?? 0).bg;
+        {/* Polyline segments (streets with geometry) */}
+        {polylineSegments.map((seg) => (
+          <Polyline
+            key={seg.id}
+            coordinates={toLatLngs(seg.geometry!)}
+            strokeColor={getPolylineColor(seg.etat)}
+            strokeWidth={4}
+            tappable
+            onPress={() => router.push(`/street/${seg.id}`)}
+          />
+        ))}
+
+        {/* Marker fallback for segments without geometry */}
+        {markerSegments.map((seg) => {
+          const color = getStatusColor(seg.etat).bg;
           return (
             <Marker
-              key={street.id}
-              coordinate={{ latitude: street.lat!, longitude: street.lng! }}
+              key={seg.id}
+              coordinate={{ latitude: seg.lat, longitude: seg.lng }}
               pinColor={color}
               tracksViewChanges={false}
             >
-              <Callout onPress={() => router.push(`/street/${street.id}`)}>
+              <Callout onPress={() => router.push(`/street/${seg.id}`)}>
                 <View style={styles.callout}>
-                  <Text style={styles.calloutName} numberOfLines={2}>{street.nom_voie}</Text>
-                  <Text style={styles.calloutStatus}>{street.etat_label}</Text>
-                  <Text style={styles.calloutCta}>Voir le détail →</Text>
+                  <Text style={styles.calloutName} numberOfLines={2}>{seg.nom_voie}</Text>
+                  <Text style={styles.calloutStatus}>{seg.etat_label}</Text>
+                  <Text style={styles.calloutCta}>Voir le detail</Text>
                 </View>
               </Callout>
             </Marker>
@@ -131,7 +181,16 @@ export default function MapScreen() {
       {loading && (
         <View style={[styles.loadingPill, { backgroundColor: C.surface }]}>
           <ActivityIndicator size="small" color={BRAND.primary} />
-          <Text style={[styles.loadingText, { color: C.textSecondary }]}>Chargement…</Text>
+          <Text style={[styles.loadingText, { color: C.textSecondary }]}>Chargement...</Text>
+        </View>
+      )}
+
+      {/* Segment count badge */}
+      {!loading && segmentCount > 0 && (
+        <View style={[styles.countPill, { backgroundColor: C.surface }]}>
+          <Text style={[styles.countText, { color: C.textSecondary }]}>
+            {segmentCount} segment{segmentCount > 1 ? 's' : ''}
+          </Text>
         </View>
       )}
 
@@ -149,13 +208,13 @@ export default function MapScreen() {
       {/* Legend */}
       <View style={[styles.legend, { backgroundColor: C.surface, borderColor: C.border }]}>
         {[
-          { label: 'Normal',  color: '#9CA3AF' },
-          { label: 'Planifié', color: '#F97316' },
+          { label: 'Normal',   color: '#9CA3AF' },
+          { label: 'Planifie', color: '#F97316' },
           { label: 'En cours', color: '#EF4444' },
-          { label: 'Terminé',  color: '#22C55E' },
+          { label: 'Termine',  color: '#22C55E' },
         ].map((item) => (
           <View key={item.label} style={styles.legendItem}>
-            <View style={[styles.legendDot, { backgroundColor: item.color }]} />
+            <View style={[styles.legendLine, { backgroundColor: item.color }]} />
             <Text style={[styles.legendLabel, { color: C.textSecondary }]}>{item.label}</Text>
           </View>
         ))}
@@ -176,6 +235,13 @@ const styles = StyleSheet.create({
     shadowColor: '#000', shadowOpacity: 0.1, shadowRadius: 4, elevation: 3,
   },
   loadingText: { fontSize: FONT_SIZE.sm },
+  countPill: {
+    position: 'absolute', top: 16, alignSelf: 'center',
+    paddingHorizontal: SPACING.sm + 2, paddingVertical: 4,
+    borderRadius: RADIUS.full,
+    shadowColor: '#000', shadowOpacity: 0.08, shadowRadius: 4, elevation: 2,
+  },
+  countText: { fontSize: FONT_SIZE.xs },
   locateBtn: {
     position: 'absolute', bottom: 100, right: 16,
     width: 48, height: 48, borderRadius: 24, borderWidth: 1,
@@ -186,11 +252,11 @@ const styles = StyleSheet.create({
     position: 'absolute', bottom: 100, left: 16,
     flexDirection: 'row', flexWrap: 'wrap', gap: 8,
     padding: SPACING.sm, borderRadius: RADIUS.md, borderWidth: 1,
-    maxWidth: 200,
+    maxWidth: 220,
     shadowColor: '#000', shadowOpacity: 0.08, shadowRadius: 4, elevation: 2,
   },
   legendItem: { flexDirection: 'row', alignItems: 'center', gap: 4 },
-  legendDot: { width: 10, height: 10, borderRadius: 5 },
+  legendLine: { width: 16, height: 4, borderRadius: 2 },
   legendLabel: { fontSize: FONT_SIZE.xs },
   callout: { width: 180, padding: 4 },
   calloutName: { fontWeight: '700', fontSize: 13, marginBottom: 2 },

@@ -130,6 +130,14 @@ function applyMigrations(db: Database.Database): void {
     db.exec(`ALTER TABLE user_watches ADD COLUMN city_id TEXT NOT NULL DEFAULT 'montreal'`);
   }
 
+  // Geometry column for polyline map data (JSON: [[lng,lat], ...])
+  if (!segCols.includes('geometry')) {
+    db.exec(`ALTER TABLE street_segments ADD COLUMN geometry TEXT`);
+  }
+
+  // Spatial-ish index for bounding box queries
+  db.exec(`CREATE INDEX IF NOT EXISTS idx_segments_lat_lng ON street_segments(city_id, lat, lng)`);
+
   db.exec(`CREATE TABLE IF NOT EXISTS cities (id TEXT PRIMARY KEY, name TEXT NOT NULL, available INTEGER NOT NULL DEFAULT 1)`);
 }
 

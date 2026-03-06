@@ -21,6 +21,15 @@ const NearbyQuerySchema = z.object({
   cityId: z.string().min(1).max(20).default('montreal'),
 });
 
+const MapQuerySchema = z.object({
+  minLat: z.coerce.number().min(44).max(48),
+  maxLat: z.coerce.number().min(44).max(48),
+  minLng: z.coerce.number().min(-76).max(-71),
+  maxLng: z.coerce.number().min(-76).max(-71),
+  cityId: z.string().min(1).max(20).default('montreal'),
+  limit: z.coerce.number().int().min(1).max(5000).default(2000),
+});
+
 export async function streetsRoutes(app: FastifyInstance) {
   // GET /api/streets/search?q=&cityId=&limit=
   app.get('/search', async (req, reply) => {
@@ -107,6 +116,46 @@ export async function streetsRoutes(app: FastifyInstance) {
     }));
 
     return reply.send({ data: results });
+  });
+
+  // GET /api/streets/map?minLat=&maxLat=&minLng=&maxLng=&cityId=&limit=
+  app.get('/map', async (req, reply) => {
+    const parsed = MapQuerySchema.safeParse(req.query);
+    if (!parsed.success) {
+      return reply.code(400).send({ error: 'Invalid query', details: parsed.error.flatten() });
+    }
+
+    const { minLat, maxLat, minLng, maxLng, cityId, limit } = parsed.data;
+    const db = getDb();
+
+    const rows = db
+      .prepare(
+        `SELECT s.id, s.nom_voie, s.lat, s.lng, s.geometry, s.cote,
+                os.etat, os.date_deb_planif, os.date_fin_planif
+         FROM street_segments s
+         LEFT JOIN operation_statuses os ON os.segment_id = s.id
+         WHERE s.city_id = ?
+           AND s.lat BETWEEN ? AND ?
+           AND s.lng BETWEEN ? AND ?
+           AND s.lat IS NOT NULL
+         ORDER BY s.id
+         LIMIT ?`
+      )
+      .all(cityId, minLat, maxLat, minLng, maxLng, limit) as Array<Record<string, unknown>>;
+
+    const segments = rows.map((row) => ({
+      id: row.id,
+      nom_voie: row.nom_voie,
+      cote: row.cote,
+      lat: row.lat,
+      lng: row.lng,
+      etat: row.etat ?? 0,
+      etat_label: etatLabel(row.etat as number | null),
+      date_deb_planif: row.date_deb_planif,
+      geometry: row.geometry ? JSON.parse(row.geometry as string) : null,
+    }));
+
+    return reply.send({ data: segments, total: segments.length });
   });
 
   // GET /api/streets/:segmentId
