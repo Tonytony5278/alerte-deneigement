@@ -65,6 +65,10 @@ services/api/data/*.db
 services/api/data/*.db-shm
 services/api/data/*.db-wal
 
+# Generated geometry data (large files)
+data/
+!data/.gitkeep
+
 # Expo
 apps/mobile/.expo/
 apps/mobile/android/

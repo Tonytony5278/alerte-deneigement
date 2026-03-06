@@ -193,21 +193,30 @@ export async function syncGeobase(): Promise<void> {
 /**
  * Enriches Montreal street segments with polyline geometry from a configurable source.
  * Expected format: JSON object mapping cote_rue_id → [[lng, lat], ...]
+ *
+ * Source can be a URL (GEOBASE_GEOMETRY_URL) or a local file path.
  */
 export async function syncGeobaseGeometry(): Promise<void> {
   if (!config.geobaseGeometryUrl) return;
 
   const db = getDb();
-  const res = await fetch(config.geobaseGeometryUrl, {
-    headers: { 'User-Agent': 'AlerteDeneigement/1.0' },
-    signal: AbortSignal.timeout(60_000),
-  });
+  let geoMap: Record<string, number[][] | { coordinates: number[][] }>;
 
-  if (!res.ok) {
-    throw new Error(`Geobase geometry API responded ${res.status}`);
+  if (config.geobaseGeometryUrl.startsWith('http')) {
+    const res = await fetch(config.geobaseGeometryUrl, {
+      headers: { 'User-Agent': 'AlerteDeneigement/1.0' },
+      signal: AbortSignal.timeout(120_000),
+    });
+    if (!res.ok) {
+      throw new Error(`Geobase geometry API responded ${res.status}`);
+    }
+    geoMap = (await res.json()) as Record<string, number[][] | { coordinates: number[][] }>;
+  } else {
+    // Local file path
+    const fs = await import('fs');
+    const raw = fs.readFileSync(config.geobaseGeometryUrl, 'utf-8');
+    geoMap = JSON.parse(raw);
   }
-
-  const geoMap = (await res.json()) as Record<string, number[][] | { coordinates: number[][] }>;
 
   const updateGeometry = db.prepare(`
     UPDATE street_segments
