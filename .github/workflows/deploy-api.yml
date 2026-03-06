@@ -15,27 +15,9 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - uses: actions/setup-node@v4
-        with:
-          node-version: 22
-          cache: npm
-          cache-dependency-path: services/api/package.json
-
-      - name: Install all deps & build
+      - name: Create deployment zip (source for Oryx build)
         working-directory: services/api
-        run: |
-          npm ci
-          npm run build
-
-      - name: Install production deps only
-        working-directory: services/api
-        run: |
-          rm -rf node_modules
-          npm ci --omit=dev
-
-      - name: Create deployment zip
-        working-directory: services/api
-        run: zip -r deploy.zip package.json dist/ node_modules/
+        run: zip -r deploy.zip package.json tsconfig.json src/
 
       - name: Login to Azure
         uses: azure/login@v2
@@ -49,9 +31,21 @@ jobs:
             --resource-group alerte-neige-rg \
             --src-path services/api/deploy.zip \
             --type zip \
-            --async true
+            --async true \
+            --timeout 900
+
+      - name: Wait for deployment
+        run: sleep 60
 
       - name: Health check
         run: |
-          sleep 20
-          curl -sf https://api.alertneige.app/api/health || echo "Health check pending — app may still be starting"
+          for i in 1 2 3 4 5; do
+            if curl -sf https://api.alertneige.app/api/health; then
+              echo "API is healthy!"
+              exit 0
+            fi
+            echo "Attempt $i failed, waiting 30s..."
+            sleep 30
+          done
+          echo "Health check failed after 5 attempts"
+          exit 1
