@@ -40,28 +40,18 @@ jobs:
         with:
           creds: ${{ secrets.AZURE_CREDENTIALS }}
 
-      - name: Disable Oryx build on Azure
-        run: |
-          az webapp config appsettings set \
-            --name alerte-neige-api \
-            --resource-group alerte-neige-rg \
-            --settings SCM_DO_BUILD_DURING_DEPLOYMENT=false
-
-      - name: Deploy to Azure Web App
+      - name: Deploy pre-built zip to Azure
         run: |
           az webapp deploy \
             --name alerte-neige-api \
             --resource-group alerte-neige-rg \
             --src-path services/api/deploy.zip \
             --type zip \
-            --async true \
             --timeout 300
-
-      - name: Wait for deployment
-        run: sleep 45
 
       - name: Health check
         run: |
+          sleep 30
           for i in 1 2 3 4 5; do
             if curl -sf https://api.alertneige.app/api/health; then
               echo "API is healthy!"
