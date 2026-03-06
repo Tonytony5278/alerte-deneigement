@@ -42,6 +42,7 @@
     },
     "plugins": [
       "expo-router",
+      "./plugins/withWidget",
       [
         "expo-notifications",
         {

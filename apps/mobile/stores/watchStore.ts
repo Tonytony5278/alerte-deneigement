@@ -4,6 +4,7 @@ import * as SecureStore from 'expo-secure-store';
 import type { WatchResult, StreetResult, WatchConfig } from '@/services/api';
 import { createWatch, deleteWatch, getWatches, updateWatch } from '@/services/api';
 import { getPushToken } from '@/services/notificationService';
+import { updateWidgetData } from '@/services/widgetBridge';
 
 // v4 uuid dependency — lightweight polyfill using Math.random for RN
 function generateUuid(): string {
@@ -65,6 +66,7 @@ export const useWatchStore = create<WatchStore>((set, get) => ({
     try {
       const watches = await getWatches(anonUserId);
       set({ watches, isLoading: false });
+      void updateWidgetData(watches);
     } catch (err) {
       const msg = err instanceof Error ? err.message : 'Erreur de chargement';
       set({ error: msg, isLoading: false });
@@ -85,7 +87,9 @@ export const useWatchStore = create<WatchStore>((set, get) => ({
         anonUserId,
         label: label ?? segment.nom_voie,
       });
-      set((state) => ({ watches: [watch, ...state.watches], isLoading: false }));
+      const newWatches = [watch, ...get().watches];
+      set({ watches: newWatches, isLoading: false });
+      void updateWidgetData(newWatches);
       return watch;
     } catch (err) {
       const msg = err instanceof Error ? err.message : 'Impossible de créer la surveillance';
@@ -98,10 +102,9 @@ export const useWatchStore = create<WatchStore>((set, get) => ({
     set({ isLoading: true });
     try {
       await deleteWatch(watchId);
-      set((state) => ({
-        watches: state.watches.filter((w) => w.id !== watchId),
-        isLoading: false,
-      }));
+      const remaining = get().watches.filter((w) => w.id !== watchId);
+      set({ watches: remaining, isLoading: false });
+      void updateWidgetData(remaining);
     } catch (err) {
       const msg = err instanceof Error ? err.message : 'Impossible de supprimer la surveillance';
       set({ error: msg, isLoading: false });

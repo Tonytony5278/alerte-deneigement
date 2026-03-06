@@ -25,6 +25,14 @@ export interface CityConfig {
   bounds: { minLat: number; maxLat: number; minLng: number; maxLng: number };
 }
 
+/** A sub-operation tracked for a street segment (e.g. sidewalk clearing, salt spreading) */
+export interface SubOperation {
+  type: string;       // 'tassement' | 'trottoir' | 'soufflage' | 'epandage' | 'cyclable' | 'pieton'
+  label: string;      // French display name
+  status: UnifiedStatus;
+  date: string | null; // ISO timestamp of last update for this operation
+}
+
 export interface NormalizedSegment {
   externalId: string;
   cityId: string;
@@ -36,6 +44,8 @@ export interface NormalizedSegment {
   planifEnd: string | null;
   /** Polyline geometry: array of [lng, lat] coordinate pairs (GeoJSON order) */
   geometry?: number[][] | null;
+  /** Additional operation types beyond the primary status */
+  subOperations?: SubOperation[];
 }
 
 // ─── Montreal-specific (legacy) ────────────────────────────────────────────

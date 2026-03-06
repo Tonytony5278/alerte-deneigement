@@ -2,7 +2,7 @@ import { Expo, type ExpoPushMessage, type ExpoPushErrorTicket } from 'expo-serve
 import { getDb } from '../db';
 import { v4 as uuidv4 } from 'uuid';
 import type { UserWatch, NotificationType } from '../types';
-import { EtatDeneig, ETAT_LABELS } from '../types';
+import { UnifiedStatus, UNIFIED_STATUS_LABELS } from '../types';
 
 const expo = new Expo();
 
@@ -21,7 +21,21 @@ function buildMessage(
 
   switch (type) {
     case 'status_change': {
-      const label = etat !== undefined ? ETAT_LABELS[etat] : 'changé';
+      // Towing-specific message when parking ban is about to start
+      if (etat === UnifiedStatus.SCHEDULED && dateDebPlanif) {
+        const time = formatTime(dateDebPlanif);
+        return {
+          title: '🚨 Panneaux installés !',
+          body: `Remorquage prévu à ${time} sur ${streetName} — déplace ton auto`,
+        };
+      }
+      if (etat === UnifiedStatus.RESTRICTED) {
+        return {
+          title: '🚫 Stationnement interdit',
+          body: `${streetName} — interdiction active, risque de remorquage`,
+        };
+      }
+      const label = etat !== undefined ? (UNIFIED_STATUS_LABELS[etat as UnifiedStatus] ?? 'changé') : 'changé';
       return {
         title: '❄️ Alerte Déneigement',
         body: `${streetName} — statut: ${label}`,
@@ -43,8 +57,8 @@ function buildMessage(
     }
     case 'in_progress':
       return {
-        title: '🚛 Chargement en cours !',
-        body: `Opération active sur ${streetName} — déplace-toi maintenant`,
+        title: '🚛 Remorquage actif !',
+        body: `Opération en cours sur ${streetName} — déplace ton auto maintenant`,
       };
     case 'storm_alert':
       return {
@@ -145,6 +159,11 @@ export async function notifyStatusChange(
     .get(segmentId) as StreetInfo | undefined;
   if (!street) return;
 
+  const opStatus = db
+    .prepare('SELECT date_deb_planif FROM operation_statuses WHERE segment_id = ?')
+    .get(segmentId) as { date_deb_planif: string | null } | undefined;
+  const dateDebPlanif = opStatus?.date_deb_planif ?? null;
+
   const watches = db
     .prepare(
       "SELECT * FROM user_watches WHERE segment_id = ? AND notify_on_change = 1"
@@ -155,10 +174,12 @@ export async function notifyStatusChange(
 
   for (const watch of watches) {
     if (!Expo.isExpoPushToken(watch.push_token)) continue;
-    if (isInQuietHours(watch) && newEtat !== EtatDeneig.EN_COURS) continue; // urgent = ignore quiet
+    // Urgent statuses bypass quiet hours — car might get towed
+    const isUrgent = newEtat === UnifiedStatus.IN_PROGRESS || newEtat === UnifiedStatus.SCHEDULED || newEtat === UnifiedStatus.RESTRICTED;
+    if (isInQuietHours(watch) && !isUrgent) continue;
     if (hasRecentNotif(watch.id, 'status_change', 5)) continue;
 
-    const { title, body } = buildMessage('status_change', street, newEtat);
+    const { title, body } = buildMessage('status_change', street, newEtat, dateDebPlanif);
     messages.push({
       watchId: watch.id,
       message: {
@@ -167,12 +188,12 @@ export async function notifyStatusChange(
         body,
         sound: 'default',
         data: { segmentId, type: 'status_change', etat: newEtat },
-        channelId: 'deneigement',
+        channelId: newEtat === UnifiedStatus.SCHEDULED ? 'deneigement-urgent' : 'deneigement',
       },
     });
 
-    // Also send in_progress if EN_COURS
-    if (newEtat === EtatDeneig.EN_COURS) {
+    // Also send in_progress if IN_PROGRESS
+    if (newEtat === UnifiedStatus.IN_PROGRESS) {
       const urgent = buildMessage('in_progress', street);
       messages.push({
         watchId: watch.id,
@@ -213,7 +234,7 @@ export async function notifyScheduledReminders(): Promise<void> {
       `SELECT s.id, s.nom_voie, s.arrondissement, os.date_deb_planif
        FROM operation_statuses os
        JOIN street_segments s ON s.id = os.segment_id
-       WHERE os.etat IN (2, 3) AND os.date_deb_planif IS NOT NULL`
+       WHERE os.etat = ${UnifiedStatus.SCHEDULED} AND os.date_deb_planif IS NOT NULL`
     )
     .all() as Array<{
     id: string;

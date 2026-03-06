@@ -10,6 +10,8 @@ import { useSettingsStore } from '@/stores/settingsStore';
 import { setupNotificationChannels, addResponseListener } from '@/services/notificationService';
 import { COLORS } from '@/constants/colors';
 import { router } from 'expo-router';
+import { ErrorBoundary } from '@/components/ErrorBoundary';
+import { OfflineBanner } from '@/components/OfflineBanner';
 
 SplashScreen.preventAutoHideAsync();
 
@@ -52,26 +54,29 @@ export default function RootLayout() {
   }, []);
 
   return (
-    <QueryClientProvider client={queryClient}>
-      <StatusBar style={scheme === 'dark' ? 'light' : 'dark'} />
-      <Stack
-        screenOptions={{
-          headerStyle: { backgroundColor: C.background },
-          headerTintColor: C.text,
-          headerTitleStyle: { fontWeight: '700', color: C.text },
-          contentStyle: { backgroundColor: C.background },
-        }}
-      >
-        <Stack.Screen name="onboarding" options={{ headerShown: false, gestureEnabled: false }} />
-        <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
-        <Stack.Screen
-          name="street/[id]"
-          options={{
-            title: 'Détail de la rue',
-            headerBackTitle: 'Retour',
+    <ErrorBoundary>
+      <QueryClientProvider client={queryClient}>
+        <StatusBar style={scheme === 'dark' ? 'light' : 'dark'} />
+        <OfflineBanner />
+        <Stack
+          screenOptions={{
+            headerStyle: { backgroundColor: C.background },
+            headerTintColor: C.text,
+            headerTitleStyle: { fontWeight: '700', color: C.text },
+            contentStyle: { backgroundColor: C.background },
           }}
-        />
-      </Stack>
-    </QueryClientProvider>
+        >
+          <Stack.Screen name="onboarding" options={{ headerShown: false, gestureEnabled: false }} />
+          <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
+          <Stack.Screen
+            name="street/[id]"
+            options={{
+              title: 'Détail de la rue',
+              headerBackTitle: 'Retour',
+            }}
+          />
+        </Stack>
+      </QueryClientProvider>
+    </ErrorBoundary>
   );
 }

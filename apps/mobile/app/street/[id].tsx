@@ -7,12 +7,13 @@ import { useLocalSearchParams, router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { useQuery } from '@tanstack/react-query';
 
-import { COLORS, SPACING, RADIUS, FONT_SIZE, BRAND, type ThemeColors } from '@/constants/colors';
-import { getStreet, submitReport, type StreetResult } from '@/services/api';
+import { COLORS, SPACING, RADIUS, FONT_SIZE, BRAND, getStatusColor, type ThemeColors } from '@/constants/colors';
+import { getStreet, submitReport, type StreetResult, type SubOperation } from '@/services/api';
 import { StatusBadge } from '@/components/StatusBadge';
 import { DisclaimerBanner } from '@/components/DisclaimerBanner';
 import { useWatchStore } from '@/stores/watchStore';
 import { formatDateTime, formatRelativeTime } from '@/utils/formatters';
+import { useTowingCountdown } from '@/utils/useTowingCountdown';
 
 export default function StreetDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
@@ -93,6 +94,8 @@ export default function StreetDetailScreen() {
     );
   }
 
+  const towingCountdown = useTowingCountdown(street.date_deb_planif, street.towing_status);
+
   const formattedDebPlanif = street.date_deb_planif ? formatDateTime(street.date_deb_planif) : null;
   const formattedFinPlanif = street.date_fin_planif ? formatDateTime(street.date_fin_planif) : null;
   const lastUpdate = street.updated_at ? formatRelativeTime(street.updated_at) : null;
@@ -119,6 +122,27 @@ export default function StreetDetailScreen() {
             <StatusBadge etat={street.etat ?? null} size="lg" />
           </View>
         </View>
+
+        {/* Towing alert banner */}
+        {street.towing_status === 'active' && (
+          <View style={[styles.towingBanner, styles.towingActive]}>
+            <Ionicons name="warning" size={18} color="#FFFFFF" />
+            <Text style={styles.towingActiveText}>{street.towing_label}</Text>
+          </View>
+        )}
+        {street.towing_status === 'imminent' && (
+          <View style={[styles.towingBanner, styles.towingImminent]}>
+            <Ionicons name="alert-circle-outline" size={18} color="#92400E" />
+            <View style={{ flex: 1 }}>
+              <Text style={styles.towingImminentText}>
+                {towingCountdown
+                  ? `Remorquage dans ${towingCountdown}`
+                  : street.towing_label}
+              </Text>
+              <Text style={styles.towingSubtext}>Panneaux installes — deplace ton auto</Text>
+            </View>
+          </View>
+        )}
 
         {/* Stale data warning */}
         {isStaleData && (
@@ -166,6 +190,16 @@ export default function StreetDetailScreen() {
             </Text>
           )}
         </View>
+
+        {/* Sub-operations (sidewalk, snow blowing, salt, etc.) */}
+        {street.sub_operations && street.sub_operations.length > 0 && (
+          <View style={[styles.card, { backgroundColor: C.surface, borderColor: C.border }]}>
+            <Text style={[styles.cardTitle, { color: C.textMuted }]}>OPÉRATIONS DÉTAILLÉES</Text>
+            {street.sub_operations.map((op, i) => (
+              <SubOperationRow key={op.type} op={op} C={C} last={i === street.sub_operations!.length - 1} />
+            ))}
+          </View>
+        )}
 
         {/* Watch toggle */}
         <View style={[styles.card, { backgroundColor: C.surface, borderColor: C.border }]}>
@@ -219,6 +253,41 @@ export default function StreetDetailScreen() {
         </TouchableOpacity>
       </ScrollView>
     </SafeAreaView>
+  );
+}
+
+const STATUS_LABELS: Record<number, string> = {
+  0: 'Inconnu',
+  1: 'Normal',
+  2: 'Planifié',
+  3: 'En cours',
+  4: 'Terminé',
+  5: 'Interdit',
+};
+
+const OP_ICONS: Record<string, string> = {
+  tassement: 'snow-outline',
+  trottoir: 'walk-outline',
+  soufflage: 'cloudy-outline',
+  epandage: 'water-outline',
+  cyclable: 'bicycle-outline',
+  routier: 'car-outline',
+  pieton: 'walk-outline',
+};
+
+function SubOperationRow({ op, C, last }: { op: SubOperation; C: ThemeColors; last: boolean }) {
+  const statusColor = getStatusColor(op.status);
+  const icon = OP_ICONS[op.type] ?? 'ellipse-outline';
+  return (
+    <View style={[styles.subOpRow, !last && { borderBottomColor: C.border, borderBottomWidth: StyleSheet.hairlineWidth }]}>
+      <Ionicons name={icon as keyof typeof Ionicons.glyphMap} size={16} color={C.icon} style={{ width: 22 }} />
+      <Text style={[styles.subOpLabel, { color: C.text }]}>{op.label}</Text>
+      <View style={[styles.subOpBadge, { backgroundColor: statusColor.bg }]}>
+        <Text style={[styles.subOpBadgeText, { color: statusColor.text }]}>
+          {STATUS_LABELS[op.status] ?? 'Inconnu'}
+        </Text>
+      </View>
+    </View>
   );
 }
 
@@ -285,4 +354,24 @@ const styles = StyleSheet.create({
     borderRadius: RADIUS.sm, marginBottom: SPACING.sm, borderWidth: 1,
   },
   staleText: { fontSize: FONT_SIZE.xs, flex: 1 },
+  towingBanner: {
+    flexDirection: 'row', alignItems: 'center', gap: 8,
+    paddingHorizontal: SPACING.md, paddingVertical: SPACING.sm + 2,
+    borderRadius: RADIUS.md, marginBottom: SPACING.sm,
+  },
+  towingActive: { backgroundColor: '#DC2626' },
+  towingActiveText: { color: '#FFFFFF', fontSize: FONT_SIZE.sm, fontWeight: '700', flex: 1 },
+  towingImminent: { backgroundColor: '#FEF3C7', borderWidth: 1, borderColor: '#F59E0B' },
+  towingImminentText: { color: '#92400E', fontSize: FONT_SIZE.sm, fontWeight: '700' },
+  towingSubtext: { color: '#92400E', fontSize: FONT_SIZE.xs, marginTop: 1 },
+  subOpRow: {
+    flexDirection: 'row', alignItems: 'center', gap: SPACING.sm,
+    paddingVertical: SPACING.sm,
+  },
+  subOpLabel: { flex: 1, fontSize: FONT_SIZE.sm, fontWeight: '500' },
+  subOpBadge: {
+    paddingHorizontal: 8, paddingVertical: 3,
+    borderRadius: RADIUS.full,
+  },
+  subOpBadgeText: { fontSize: FONT_SIZE.xs, fontWeight: '700' },
 });

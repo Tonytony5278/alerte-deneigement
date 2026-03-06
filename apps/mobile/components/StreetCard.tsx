@@ -3,8 +3,9 @@ import { View, Text, TouchableOpacity, StyleSheet, useColorScheme } from 'react-
 import { Ionicons } from '@expo/vector-icons';
 import { COLORS, SPACING, RADIUS, FONT_SIZE } from '@/constants/colors';
 import { StatusBadge } from './StatusBadge';
-import type { WatchResult } from '@/services/api';
+import type { WatchResult, TowingStatus } from '@/services/api';
 import { formatDateTimeShort, formatRelativeTime } from '@/utils/formatters';
+import { useTowingCountdown } from '@/utils/useTowingCountdown';
 
 interface StreetCardProps {
   watch: WatchResult;
@@ -19,6 +20,7 @@ export function StreetCard({ watch, onPressDeplacer, onPress }: StreetCardProps)
   const streetName = watch.nom_voie ?? watch.segment_id;
   const formattedDate = watch.date_deb_planif ? formatDateTimeShort(watch.date_deb_planif) : null;
   const lastUpdate = watch.updated_at ? formatRelativeTime(watch.updated_at) : null;
+  const towingCountdown = useTowingCountdown(watch.date_deb_planif, watch.towing_status);
 
   return (
     <TouchableOpacity
@@ -41,6 +43,21 @@ export function StreetCard({ watch, onPressDeplacer, onPress }: StreetCardProps)
         </View>
         <StatusBadge etat={watch.etat ?? null} size="sm" />
       </View>
+
+      {watch.towing_status === 'active' && (
+        <View style={[styles.towingRow, { backgroundColor: '#FEE2E2' }]}>
+          <Ionicons name="warning" size={13} color="#DC2626" />
+          <Text style={styles.towingActiveText}>Remorquage actif</Text>
+        </View>
+      )}
+      {watch.towing_status === 'imminent' && (
+        <View style={[styles.towingRow, { backgroundColor: '#FEF3C7' }]}>
+          <Ionicons name="alert-circle-outline" size={13} color="#92400E" />
+          <Text style={styles.towingImminentText}>
+            {towingCountdown ? `Remorquage dans ${towingCountdown}` : 'Remorquage imminent'}
+          </Text>
+        </View>
+      )}
 
       {formattedDate && (
         <View style={styles.planifRow}>
@@ -131,5 +148,24 @@ const styles = StyleSheet.create({
   deplacerText: {
     fontSize: FONT_SIZE.sm,
     fontWeight: '600',
+  },
+  towingRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+    paddingHorizontal: SPACING.sm,
+    paddingVertical: 4,
+    borderRadius: RADIUS.sm,
+    marginTop: SPACING.xs,
+  },
+  towingActiveText: {
+    fontSize: FONT_SIZE.xs,
+    fontWeight: '700',
+    color: '#DC2626',
+  },
+  towingImminentText: {
+    fontSize: FONT_SIZE.xs,
+    fontWeight: '600',
+    color: '#92400E',
   },
 });

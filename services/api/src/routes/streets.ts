@@ -8,6 +8,31 @@ function etatLabel(etat: number | null): string {
   return UNIFIED_STATUS_LABELS[etat as UnifiedStatus] ?? 'Inconnu';
 }
 
+type TowingStatus = 'active' | 'imminent' | 'none';
+
+interface TowingInfo {
+  towing_status: TowingStatus;
+  towing_label: string | null;
+}
+
+function computeTowing(etat: number | null, dateDebPlanif: string | null): TowingInfo {
+  if (etat === UnifiedStatus.IN_PROGRESS || etat === UnifiedStatus.RESTRICTED) {
+    return { towing_status: 'active', towing_label: 'Remorquage actif — déplace ton auto !' };
+  }
+  if (etat === UnifiedStatus.SCHEDULED && dateDebPlanif) {
+    const planifTime = new Date(dateDebPlanif).getTime();
+    const now = Date.now();
+    if (now >= planifTime) {
+      return { towing_status: 'active', towing_label: 'Remorquage actif — déplace ton auto !' };
+    }
+    const hoursUntil = (planifTime - now) / 3_600_000;
+    if (hoursUntil <= 12) {
+      return { towing_status: 'imminent', towing_label: 'Remorquage imminent — panneaux installés' };
+    }
+  }
+  return { towing_status: 'none', towing_label: null };
+}
+
 const SearchQuerySchema = z.object({
   q: z.string().min(2).max(100),
   cityId: z.string().min(1).max(20).default('montreal'),
@@ -77,6 +102,7 @@ export async function streetsRoutes(app: FastifyInstance) {
     const results = (rows as Array<Record<string, unknown>>).map((row) => ({
       ...row,
       etat_label: etatLabel(row.etat as number | null),
+      ...computeTowing(row.etat as number | null, row.date_deb_planif as string | null),
     }));
 
     return reply.send({ data: results, total: results.length });
@@ -113,6 +139,7 @@ export async function streetsRoutes(app: FastifyInstance) {
     const results = rows.map((row) => ({
       ...row,
       etat_label: etatLabel(row.etat as number | null),
+      ...computeTowing(row.etat as number | null, row.date_deb_planif as string | null),
     }));
 
     return reply.send({ data: results });
@@ -131,7 +158,7 @@ export async function streetsRoutes(app: FastifyInstance) {
     const rows = db
       .prepare(
         `SELECT s.id, s.nom_voie, s.lat, s.lng, s.geometry, s.cote,
-                os.etat, os.date_deb_planif, os.date_fin_planif
+                os.etat, os.date_deb_planif, os.date_fin_planif, os.sub_operations
          FROM street_segments s
          LEFT JOIN operation_statuses os ON os.segment_id = s.id
          WHERE s.city_id = ?
@@ -153,6 +180,8 @@ export async function streetsRoutes(app: FastifyInstance) {
       etat_label: etatLabel(row.etat as number | null),
       date_deb_planif: row.date_deb_planif,
       geometry: row.geometry ? JSON.parse(row.geometry as string) : null,
+      sub_operations: row.sub_operations ? JSON.parse(row.sub_operations as string) : null,
+      ...computeTowing(row.etat as number | null, row.date_deb_planif as string | null),
     }));
 
     return reply.send({ data: segments, total: segments.length });
@@ -165,7 +194,7 @@ export async function streetsRoutes(app: FastifyInstance) {
 
     const row = db
       .prepare(
-        `SELECT s.*, os.etat, os.date_deb_planif, os.date_fin_planif, os.updated_at, os.source_ts
+        `SELECT s.*, os.etat, os.date_deb_planif, os.date_fin_planif, os.updated_at, os.source_ts, os.sub_operations
          FROM street_segments s
          LEFT JOIN operation_statuses os ON os.segment_id = s.id
          WHERE s.id = ?`
@@ -176,8 +205,14 @@ export async function streetsRoutes(app: FastifyInstance) {
       return reply.code(404).send({ error: 'Segment not found' });
     }
 
+    const sub = row.sub_operations ? JSON.parse(row.sub_operations as string) : null;
     return reply.send({
-      data: { ...row, etat_label: etatLabel(row.etat as number | null) },
+      data: {
+        ...row,
+        etat_label: etatLabel(row.etat as number | null),
+        sub_operations: sub,
+        ...computeTowing(row.etat as number | null, row.date_deb_planif as string | null),
+      },
     });
   });
 

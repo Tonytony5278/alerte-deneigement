@@ -191,31 +191,86 @@ export async function syncGeobase(): Promise<void> {
 }
 
 /**
- * Enriches Montreal street segments with polyline geometry from a configurable source.
- * Expected format: JSON object mapping cote_rue_id → [[lng, lat], ...]
+ * Enriches Montreal street segments with polyline geometry.
  *
- * Source can be a URL (GEOBASE_GEOMETRY_URL) or a local file path.
+ * Sources (tried in order):
+ *   1. GEOBASE_GEOMETRY_URL env var (pre-built JSON map or local file)
+ *   2. Montreal Open Data "Géobase double" GeoJSON (~75MB, processed in-memory)
+ *
+ * The Open Data source contains ~91,000 features with COTE_RUE_ID + LineString geometry.
  */
+const GEOBASE_GEOJSON_URL =
+  'https://donnees.montreal.ca/dataset/88493b16-220f-4709-b57b-1ea57c5ba405/resource/16f7fa0a-9ce6-4b29-a7fc-00842c593927/download/gbdouble.json';
+
 export async function syncGeobaseGeometry(): Promise<void> {
-  if (!config.geobaseGeometryUrl) return;
-
   const db = getDb();
-  let geoMap: Record<string, number[][] | { coordinates: number[][] }>;
+  let geoMap: Record<string, number[][]>;
 
-  if (config.geobaseGeometryUrl.startsWith('http')) {
-    const res = await fetch(config.geobaseGeometryUrl, {
+  if (config.geobaseGeometryUrl) {
+    // Use pre-built geometry map (URL or local file)
+    if (config.geobaseGeometryUrl.startsWith('http')) {
+      const res = await fetch(config.geobaseGeometryUrl, {
+        headers: { 'User-Agent': 'AlerteDeneigement/1.0' },
+        signal: AbortSignal.timeout(120_000),
+      });
+      if (!res.ok) {
+        throw new Error(`Geobase geometry API responded ${res.status}`);
+      }
+      const raw = (await res.json()) as Record<string, number[][] | { coordinates: number[][] }>;
+      geoMap = {};
+      for (const [id, value] of Object.entries(raw)) {
+        geoMap[id] = Array.isArray(value) ? value : value.coordinates;
+      }
+    } else {
+      const fs = await import('fs');
+      const raw = fs.readFileSync(config.geobaseGeometryUrl, 'utf-8');
+      geoMap = JSON.parse(raw);
+    }
+  } else {
+    // Download and process Montreal Open Data GeoJSON directly
+    console.log('[Geobase] Downloading Montreal Géobase double GeoJSON...');
+    const res = await fetch(GEOBASE_GEOJSON_URL, {
       headers: { 'User-Agent': 'AlerteDeneigement/1.0' },
-      signal: AbortSignal.timeout(120_000),
+      signal: AbortSignal.timeout(180_000), // 3 min — large file
     });
     if (!res.ok) {
-      throw new Error(`Geobase geometry API responded ${res.status}`);
+      throw new Error(`Géobase GeoJSON download failed: ${res.status}`);
     }
-    geoMap = (await res.json()) as Record<string, number[][] | { coordinates: number[][] }>;
-  } else {
-    // Local file path
-    const fs = await import('fs');
-    const raw = fs.readFileSync(config.geobaseGeometryUrl, 'utf-8');
-    geoMap = JSON.parse(raw);
+
+    const geojson = (await res.json()) as {
+      features?: Array<{
+        properties?: Record<string, unknown>;
+        geometry?: { type: string; coordinates: unknown };
+      }>;
+    };
+    const features = geojson.features ?? [];
+    console.log(`[Geobase] Processing ${features.length} GeoJSON features...`);
+
+    geoMap = {};
+    for (const feature of features) {
+      const props = feature.properties ?? {};
+      const coteRueId = String(props['COTE_RUE_ID'] ?? props['cote_rue_id'] ?? '');
+      if (!coteRueId) continue;
+
+      const geom = feature.geometry;
+      if (!geom?.coordinates) continue;
+
+      let coords: number[][] | undefined;
+      if (geom.type === 'LineString') {
+        coords = geom.coordinates as number[][];
+      } else if (geom.type === 'MultiLineString') {
+        coords = (geom.coordinates as number[][][]).flat();
+      }
+
+      if (!coords || coords.length < 2) continue;
+
+      // Round to 6 decimal places (~11cm precision)
+      geoMap[coteRueId] = coords.map(([lng, lat]) => [
+        Math.round(lng * 1e6) / 1e6,
+        Math.round(lat * 1e6) / 1e6,
+      ]);
+    }
+    console.log(`[Geobase] Extracted geometry for ${Object.keys(geoMap).length} segments`);
   }
 
   const updateGeometry = db.prepare(`
@@ -227,8 +282,7 @@ export async function syncGeobaseGeometry(): Promise<void> {
   `);
 
   const enrich = db.transaction(() => {
-    for (const [id, value] of Object.entries(geoMap)) {
-      const coords = Array.isArray(value) ? value : value.coordinates;
+    for (const [id, coords] of Object.entries(geoMap)) {
       if (!coords || coords.length === 0) continue;
 
       // Compute centroid for lat/lng
@@ -270,17 +324,19 @@ export async function syncCity(adapter: CityAdapter): Promise<{ result: SyncResu
   `);
 
   const upsertStatus = db.prepare(`
-    INSERT INTO operation_statuses (segment_id, etat, date_deb_planif, date_fin_planif, updated_at, source_ts)
-    VALUES (@segment_id, @etat, @date_deb_planif, @date_fin_planif, @updated_at, @source_ts)
+    INSERT INTO operation_statuses (segment_id, etat, date_deb_planif, date_fin_planif, updated_at, source_ts, sub_operations)
+    VALUES (@segment_id, @etat, @date_deb_planif, @date_fin_planif, @updated_at, @source_ts, @sub_operations)
     ON CONFLICT(segment_id) DO UPDATE SET
       etat            = excluded.etat,
       date_deb_planif = excluded.date_deb_planif,
       date_fin_planif = excluded.date_fin_planif,
       updated_at      = excluded.updated_at,
-      source_ts       = excluded.source_ts
+      source_ts       = excluded.source_ts,
+      sub_operations  = excluded.sub_operations
     WHERE excluded.etat != operation_statuses.etat
        OR excluded.date_deb_planif IS NOT operation_statuses.date_deb_planif
        OR excluded.date_fin_planif IS NOT operation_statuses.date_fin_planif
+       OR excluded.sub_operations IS NOT operation_statuses.sub_operations
   `);
 
   const getExisting = db.prepare('SELECT etat FROM operation_statuses WHERE segment_id = ?') as Database.Statement<[string]>;
@@ -316,6 +372,7 @@ export async function syncCity(adapter: CityAdapter): Promise<{ result: SyncResu
           date_fin_planif: seg.planifEnd,
           updated_at: now,
           source_ts: null,
+          sub_operations: seg.subOperations ? JSON.stringify(seg.subOperations) : null,
         });
 
         if (hasChanged && info.changes > 0) {

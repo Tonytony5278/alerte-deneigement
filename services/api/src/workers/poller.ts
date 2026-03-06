@@ -2,6 +2,7 @@ import cron from 'node-cron';
 import { config } from '../config';
 import { syncCity, syncGeobase, syncGeobaseGeometry } from '../services/dataFetcher';
 import { notifyStatusChange, notifyScheduledReminders } from '../services/notificationService';
+import { enrichAllStreetNames } from '../services/streetNameEnricher';
 import { CITY_ADAPTERS } from '../services/cityRegistry';
 import { getDb } from '../db';
 import { v4 as uuidv4 } from 'uuid';
@@ -130,6 +131,14 @@ async function initGeobase() {
     console.log('[Geobase] Done');
   } catch (err) {
     console.error('[Geobase] Sync error (non-fatal):', err);
+  }
+
+  // Enrich street names for cities that lack them (Longueuil, Québec, etc.)
+  // Runs after geobase so all segments are in DB with coordinates
+  try {
+    await enrichAllStreetNames();
+  } catch (err) {
+    console.error('[StreetNames] Enrichment error (non-fatal):', err);
   }
 }
 

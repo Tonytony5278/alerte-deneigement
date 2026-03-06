@@ -2,6 +2,7 @@ import type { FastifyInstance } from 'fastify';
 import { getDb } from '../db';
 import { v4 as uuidv4 } from 'uuid';
 import { z } from 'zod';
+import { UnifiedStatus, UNIFIED_STATUS_LABELS } from '../types';
 
 const CreateWatchSchema = z.object({
   segmentId: z.string().min(1).max(100),
@@ -101,7 +102,7 @@ export async function watchesRoutes(app: FastifyInstance) {
     }
 
     const db = getDb();
-    const watches = db
+    const rows = db
       .prepare(
         `SELECT w.*, s.nom_voie, s.type_voie, s.cote, s.arrondissement,
                 os.etat, os.date_deb_planif, os.date_fin_planif, os.updated_at
@@ -111,7 +112,34 @@ export async function watchesRoutes(app: FastifyInstance) {
          WHERE w.anon_user_id = ?
          ORDER BY w.created_at DESC`
       )
-      .all(userId);
+      .all(userId) as Array<Record<string, unknown>>;
+
+    const watches = rows.map((row) => {
+      const etat = row.etat as number | null;
+      const dateDebPlanif = row.date_deb_planif as string | null;
+      const etatLabel = etat !== null
+        ? (UNIFIED_STATUS_LABELS[etat as UnifiedStatus] ?? 'Inconnu')
+        : 'Inconnu';
+
+      let towingStatus: 'active' | 'imminent' | 'none' = 'none';
+      let towingLabel: string | null = null;
+      if (etat === UnifiedStatus.IN_PROGRESS || etat === UnifiedStatus.RESTRICTED) {
+        towingStatus = 'active';
+        towingLabel = 'Remorquage actif — déplace ton auto !';
+      } else if (etat === UnifiedStatus.SCHEDULED && dateDebPlanif) {
+        const planifTime = new Date(dateDebPlanif).getTime();
+        const now = Date.now();
+        if (now >= planifTime) {
+          towingStatus = 'active';
+          towingLabel = 'Remorquage actif — déplace ton auto !';
+        } else if ((planifTime - now) / 3_600_000 <= 12) {
+          towingStatus = 'imminent';
+          towingLabel = 'Remorquage imminent — panneaux installés';
+        }
+      }
+
+      return { ...row, etat_label: etatLabel, towing_status: towingStatus, towing_label: towingLabel };
+    });
 
     return reply.send({ data: watches });
   });

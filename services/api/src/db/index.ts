@@ -135,6 +135,12 @@ function applyMigrations(db: Database.Database): void {
     db.exec(`ALTER TABLE street_segments ADD COLUMN geometry TEXT`);
   }
 
+  // Sub-operations JSON column (sidewalk, snow blowing, salt, etc.)
+  const opCols = (db.pragma('table_info(operation_statuses)') as Array<{ name: string }>).map((c) => c.name);
+  if (!opCols.includes('sub_operations')) {
+    db.exec(`ALTER TABLE operation_statuses ADD COLUMN sub_operations TEXT`);
+  }
+
   // Spatial-ish index for bounding box queries
   db.exec(`CREATE INDEX IF NOT EXISTS idx_segments_lat_lng ON street_segments(city_id, lat, lng)`);
 

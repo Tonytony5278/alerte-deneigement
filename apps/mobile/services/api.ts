@@ -40,6 +40,15 @@ export interface CityConfig {
   bounds: { minLat: number; maxLat: number; minLng: number; maxLng: number };
 }
 
+export interface SubOperation {
+  type: string;       // 'tassement' | 'trottoir' | 'soufflage' | 'epandage' | 'cyclable' | 'routier' | 'pieton'
+  label: string;      // French display name
+  status: number;     // UnifiedStatus value
+  date: string | null;
+}
+
+export type TowingStatus = 'active' | 'imminent' | 'none';
+
 export interface StreetResult {
   id: string;
   city_id: string;
@@ -56,6 +65,9 @@ export interface StreetResult {
   date_deb_planif: string | null;
   date_fin_planif: string | null;
   updated_at: string | null;
+  sub_operations?: SubOperation[] | null;
+  towing_status: TowingStatus;
+  towing_label: string | null;
 }
 
 export interface WatchResult {
@@ -80,6 +92,8 @@ export interface WatchResult {
   date_deb_planif?: string | null;
   date_fin_planif?: string | null;
   updated_at?: string | null;
+  towing_status?: TowingStatus;
+  towing_label?: string | null;
 }
 
 export interface ParkingSpot {
@@ -139,6 +153,9 @@ export interface MapSegment {
   date_deb_planif: string | null;
   /** Polyline coordinates [[lng, lat], ...] or null for point-only segments */
   geometry: number[][] | null;
+  sub_operations?: SubOperation[] | null;
+  towing_status: TowingStatus;
+  towing_label: string | null;
 }
 
 export async function getMapSegments(
