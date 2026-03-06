@@ -19,29 +19,26 @@ jobs:
         with:
           node-version: 22
 
-      - name: Install dependencies
-        working-directory: services/api
+      # Install at repo root (npm workspaces)
+      - name: Install all workspace dependencies
         run: npm ci
 
-      - name: Build TypeScript
-        working-directory: services/api
-        run: npx tsc -p tsconfig.json
+      # Build the API workspace
+      - name: Build API
+        run: npm run build --workspace=services/api
 
-      - name: Prune dev dependencies
-        working-directory: services/api
-        run: npm prune --omit=dev
-
+      # Create a standalone deploy package outside workspace context
       - name: Create deployment package
-        working-directory: services/api
         run: |
-          echo "=== Debug: current dir ==="
-          pwd
-          ls -la
-          echo "=== node_modules exists? ==="
-          ls -d node_modules 2>&1 || echo "NOT FOUND"
-          ls node_modules/ | head -20
-          echo "=== Creating zip ==="
-          zip -r deploy.zip package.json dist/ node_modules/
+          mkdir -p /tmp/deploy
+          cp services/api/package.json /tmp/deploy/
+          cp -r services/api/dist /tmp/deploy/dist
+          cd /tmp/deploy
+          npm install --omit=dev --ignore-scripts=false
+          ls -la node_modules/better-sqlite3/build/Release/ || echo "No prebuilt binary"
+          npm rebuild better-sqlite3
+          ls -la node_modules/better-sqlite3/build/Release/
+          zip -r $GITHUB_WORKSPACE/deploy.zip package.json dist/ node_modules/
 
       - name: Login to Azure
         uses: azure/login@v2
@@ -53,7 +50,7 @@ jobs:
           az webapp deploy \
             --name alerte-neige-api \
             --resource-group alerte-neige-rg \
-            --src-path services/api/deploy.zip \
+            --src-path deploy.zip \
             --type zip \
             --timeout 300
 
