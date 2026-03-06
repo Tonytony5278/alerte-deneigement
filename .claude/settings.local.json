@@ -58,7 +58,12 @@
       "Bash(npm install:*)",
       "Bash(npx next:*)",
       "Bash(npm run:*)",
-      "Bash(timeout 15 npx tsx:*)"
+      "Bash(timeout 15 npx tsx:*)",
+      "Bash(az account:*)",
+      "Bash(az webapp:*)",
+      "Bash(MSYS_NO_PATHCONV=1 az webapp:*)",
+      "Bash(npx bestzip:*)",
+      "Bash(powershell:*)"
     ]
   }
 }

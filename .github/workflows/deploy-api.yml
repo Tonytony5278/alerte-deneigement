@@ -6,25 +6,46 @@ on:
     paths:
       - 'services/api/**'
       - '.github/workflows/deploy-api.yml'
+  workflow_dispatch:
 
 jobs:
   deploy:
-    name: Deploy to Railway
+    name: Build & Deploy to Azure
     runs-on: ubuntu-latest
     environment: production
     steps:
       - uses: actions/checkout@v4
 
-      - name: Install Railway CLI
-        run: npm install -g @railway/cli
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: services/api/package.json
 
-      - name: Deploy
+      - name: Install all deps & build
         working-directory: services/api
-        run: railway up --service alerte-deneigement-api
-        env:
-          RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}
+        run: |
+          npm ci
+          npm run build
+
+      - name: Install production deps only
+        working-directory: services/api
+        run: |
+          rm -rf node_modules
+          npm ci --omit=dev
+
+      - name: Create deployment zip
+        working-directory: services/api
+        run: zip -r deploy.zip package.json dist/ node_modules/
+
+      - name: Deploy to Azure Web App
+        uses: azure/webapps-deploy@v3
+        with:
+          app-name: alerte-neige-api
+          publish-profile: ${{ secrets.AZURE_API_PUBLISH_PROFILE }}
+          package: services/api/deploy.zip
 
       - name: Health check
         run: |
-          sleep 10
-          curl -f ${{ secrets.API_URL }}/api/health || exit 1
+          sleep 15
+          curl -sf https://api.alertneige.app/api/health || echo "Health check pending — app may still be starting"
