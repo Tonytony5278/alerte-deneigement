@@ -15,14 +15,37 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Create deployment zip (source for Oryx build)
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Install dependencies
         working-directory: services/api
-        run: zip -r deploy.zip package.json tsconfig.json src/
+        run: npm ci
+
+      - name: Build TypeScript
+        working-directory: services/api
+        run: npm run build
+
+      - name: Prune dev dependencies
+        working-directory: services/api
+        run: npm prune --omit=dev
+
+      - name: Create deployment package
+        working-directory: services/api
+        run: zip -r deploy.zip package.json dist/ node_modules/
 
       - name: Login to Azure
         uses: azure/login@v2
         with:
           creds: ${{ secrets.AZURE_CREDENTIALS }}
+
+      - name: Disable Oryx build on Azure
+        run: |
+          az webapp config appsettings set \
+            --name alerte-neige-api \
+            --resource-group alerte-neige-rg \
+            --settings SCM_DO_BUILD_DURING_DEPLOYMENT=false
 
       - name: Deploy to Azure Web App
         run: |
@@ -32,10 +55,10 @@ jobs:
             --src-path services/api/deploy.zip \
             --type zip \
             --async true \
-            --timeout 900
+            --timeout 300
 
       - name: Wait for deployment
-        run: sleep 60
+        run: sleep 45
 
       - name: Health check
         run: |
