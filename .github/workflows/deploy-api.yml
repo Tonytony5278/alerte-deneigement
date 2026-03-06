@@ -25,7 +25,7 @@ jobs:
 
       - name: Build TypeScript
         working-directory: services/api
-        run: npm run build
+        run: npx tsc -p tsconfig.json
 
       - name: Prune dev dependencies
         working-directory: services/api
@@ -33,7 +33,15 @@ jobs:
 
       - name: Create deployment package
         working-directory: services/api
-        run: zip -r deploy.zip package.json dist/ node_modules/
+        run: |
+          echo "=== Debug: current dir ==="
+          pwd
+          ls -la
+          echo "=== node_modules exists? ==="
+          ls -d node_modules 2>&1 || echo "NOT FOUND"
+          ls node_modules/ | head -20
+          echo "=== Creating zip ==="
+          zip -r deploy.zip package.json dist/ node_modules/
 
       - name: Login to Azure
         uses: azure/login@v2
