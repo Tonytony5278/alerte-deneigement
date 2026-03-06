@@ -12,12 +12,10 @@ jobs:
   deploy:
     name: Build & Deploy to Azure
     runs-on: ubuntu-latest
+    # Use Debian Bookworm container to match Azure App Service's glibc
+    container: node:22-bookworm
     steps:
       - uses: actions/checkout@v4
-
-      - uses: actions/setup-node@v4
-        with:
-          node-version: 22
 
       # Install at repo root (npm workspaces)
       - name: Install all workspace dependencies
@@ -30,15 +28,18 @@ jobs:
       # Create a standalone deploy package outside workspace context
       - name: Create deployment package
         run: |
+          apt-get update && apt-get install -y zip
           mkdir -p /tmp/deploy
           cp services/api/package.json /tmp/deploy/
           cp -r services/api/dist /tmp/deploy/dist
           cd /tmp/deploy
-          npm install --omit=dev --ignore-scripts=false
-          ls -la node_modules/better-sqlite3/build/Release/ || echo "No prebuilt binary"
-          npm rebuild better-sqlite3
+          npm install --omit=dev
+          echo "=== Checking better-sqlite3 native addon ==="
           ls -la node_modules/better-sqlite3/build/Release/
+          node -e "const db = require('better-sqlite3')(':memory:'); console.log('better-sqlite3 OK'); db.close()"
           zip -r $GITHUB_WORKSPACE/deploy.zip package.json dist/ node_modules/
+          echo "=== Zip size ==="
+          ls -lh $GITHUB_WORKSPACE/deploy.zip
 
       - name: Login to Azure
         uses: azure/login@v2
