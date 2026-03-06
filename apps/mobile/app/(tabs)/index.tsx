@@ -1,13 +1,15 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
   View, Text, ScrollView, TouchableOpacity, TextInput,
   StyleSheet, useColorScheme, SafeAreaView, ActivityIndicator, Alert,
+  Keyboard, RefreshControl,
 } from 'react-native';
 import { router, useLocalSearchParams } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import * as Location from 'expo-location';
 
 import { COLORS, SPACING, RADIUS, FONT_SIZE, BRAND } from '@/constants/colors';
+import { FALLBACK_CITIES } from '@/constants/cities';
 import { useWatchStore } from '@/stores/watchStore';
 import { useSettingsStore } from '@/stores/settingsStore';
 import { searchStreets, getNearbyStreets, getCities, type StreetResult, type CityConfig } from '@/services/api';
@@ -16,15 +18,6 @@ import { StreetCard } from '@/components/StreetCard';
 import { DisclaimerBanner } from '@/components/DisclaimerBanner';
 import { StatusBadge } from '@/components/StatusBadge';
 import { CityPicker } from '@/components/CityPicker';
-
-const FALLBACK_CITIES: CityConfig[] = [
-  { id: 'montreal',   name: 'Montréal',            nameShort: 'MTL',  available: true,  bounds: { minLat: 45.4, maxLat: 45.7, minLng: -73.97, maxLng: -73.47 } },
-  { id: 'longueuil',  name: 'Longueuil / Brossard', nameShort: 'LGU',  available: true,  bounds: { minLat: 45.43, maxLat: 45.62, minLng: -73.6, maxLng: -73.38 } },
-  { id: 'laval',      name: 'Laval',               nameShort: 'LAV',  available: true,  bounds: { minLat: 45.49, maxLat: 45.71, minLng: -73.87, maxLng: -73.52 } },
-  { id: 'quebec',     name: 'Québec',              nameShort: 'QC',   available: true,  bounds: { minLat: 46.7, maxLat: 46.9, minLng: -71.43, maxLng: -71.1 } },
-  { id: 'gatineau',   name: 'Gatineau',            nameShort: 'GAT',  available: true,  bounds: { minLat: 45.39, maxLat: 45.56, minLng: -75.92, maxLng: -75.62 } },
-  { id: 'sherbrooke', name: 'Sherbrooke',          nameShort: 'SHE',  available: false, bounds: { minLat: 45.35, maxLat: 45.45, minLng: -71.98, maxLng: -71.83 } },
-];
 
 export default function HomeScreen() {
   const scheme = useColorScheme() ?? 'light';
@@ -137,12 +130,32 @@ export default function HomeScreen() {
     router.push(`/street/${street.id}`);
   }
 
+  const [refreshing, setRefreshing] = useState(false);
+  const { loadWatches } = useWatchStore();
+
+  const onRefresh = useCallback(async () => {
+    setRefreshing(true);
+    try {
+      await loadWatches();
+    } finally {
+      setRefreshing(false);
+    }
+  }, [loadWatches]);
+
   const activeWatch = watches[0]; // Primary vehicle watch
   const favoriteWatches = watches.slice(1);
 
   return (
     <SafeAreaView style={[styles.container, { backgroundColor: C.background }]}>
-      <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
+      <ScrollView
+        contentContainerStyle={styles.scrollContent}
+        showsVerticalScrollIndicator={false}
+        keyboardShouldPersistTaps="handled"
+        keyboardDismissMode="on-drag"
+        refreshControl={
+          <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={BRAND.primary} />
+        }
+      >
         {/* Search bar */}
         <View style={[styles.searchContainer, { backgroundColor: C.surfaceElevated, borderColor: C.border }]}>
           <Ionicons name="search" size={18} color={C.icon} style={styles.searchIcon} />
@@ -230,17 +243,28 @@ export default function HomeScreen() {
         {/* Disclaimer */}
         <DisclaimerBanner />
 
-        {/* "Je suis stationné ici" CTA */}
+        {/* Empty state + "Je suis stationné ici" CTA */}
         {watches.length === 0 && !isParkedMode && (
-          <TouchableOpacity
-            onPress={handleParkedHere}
-            style={[styles.parkedCta, { backgroundColor: BRAND.primary }]}
-            activeOpacity={0.85}
-            accessibilityRole="button"
-          >
-            <Ionicons name="car" size={22} color="#fff" />
-            <Text style={styles.parkedCtaText}>Je suis stationné ici</Text>
-          </TouchableOpacity>
+          <View style={styles.emptyState}>
+            <View style={[styles.emptyIconCircle, { backgroundColor: BRAND.secondary }]}>
+              <Ionicons name="snow" size={40} color={BRAND.primary} />
+            </View>
+            <Text style={[styles.emptyTitle, { color: C.text }]}>
+              Surveille ta rue
+            </Text>
+            <Text style={[styles.emptySubtitle, { color: C.textSecondary }]}>
+              Cherche ton adresse ou localise-toi pour recevoir des alertes de déneigement.
+            </Text>
+            <TouchableOpacity
+              onPress={handleParkedHere}
+              style={[styles.parkedCta, { backgroundColor: BRAND.primary }]}
+              activeOpacity={0.85}
+              accessibilityRole="button"
+            >
+              <Ionicons name="car" size={22} color="#fff" />
+              <Text style={styles.parkedCtaText}>Je suis stationné ici</Text>
+            </TouchableOpacity>
+          </View>
         )}
 
         {/* Active watch — Mon véhicule */}
@@ -332,10 +356,21 @@ const styles = StyleSheet.create({
   loadingText: { fontSize: FONT_SIZE.sm },
   section: { marginBottom: SPACING.md },
   sectionTitle: { fontSize: FONT_SIZE.base, fontWeight: '700', marginBottom: SPACING.sm },
+  emptyState: { alignItems: 'center', paddingVertical: SPACING.lg },
+  emptyIconCircle: {
+    width: 80, height: 80, borderRadius: 40,
+    alignItems: 'center', justifyContent: 'center',
+    marginBottom: SPACING.md,
+  },
+  emptyTitle: { fontSize: FONT_SIZE.lg, fontWeight: '700', marginBottom: SPACING.xs },
+  emptySubtitle: {
+    fontSize: FONT_SIZE.sm, textAlign: 'center', lineHeight: 20,
+    paddingHorizontal: SPACING.lg, marginBottom: SPACING.lg,
+  },
   parkedCta: {
     flexDirection: 'row', alignItems: 'center', justifyContent: 'center',
     gap: 10, padding: 18, borderRadius: RADIUS.lg,
-    marginBottom: SPACING.md,
+    marginBottom: SPACING.md, width: '100%',
   },
   parkedCtaText: { color: '#fff', fontSize: FONT_SIZE.md, fontWeight: '700' },
   parkingLink: {

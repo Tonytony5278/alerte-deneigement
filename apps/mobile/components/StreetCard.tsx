@@ -4,6 +4,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { COLORS, SPACING, RADIUS, FONT_SIZE } from '@/constants/colors';
 import { StatusBadge } from './StatusBadge';
 import type { WatchResult } from '@/services/api';
+import { formatDateTimeShort, formatRelativeTime } from '@/utils/formatters';
 
 interface StreetCardProps {
   watch: WatchResult;
@@ -16,7 +17,7 @@ export function StreetCard({ watch, onPressDeplacer, onPress }: StreetCardProps)
   const C = COLORS[scheme];
 
   const streetName = watch.nom_voie ?? watch.segment_id;
-  const formattedDate = watch.date_deb_planif ? formatDateTime(watch.date_deb_planif) : null;
+  const formattedDate = watch.date_deb_planif ? formatDateTimeShort(watch.date_deb_planif) : null;
   const lastUpdate = watch.updated_at ? formatRelativeTime(watch.updated_at) : null;
 
   return (
@@ -72,30 +73,6 @@ export function StreetCard({ watch, onPressDeplacer, onPress }: StreetCardProps)
       )}
     </TouchableOpacity>
   );
-}
-
-function formatDateTime(iso: string): string {
-  const d = new Date(iso);
-  const today = new Date();
-  const isToday =
-    d.getDate() === today.getDate() &&
-    d.getMonth() === today.getMonth() &&
-    d.getFullYear() === today.getFullYear();
-
-  const time = d.toLocaleTimeString('fr-CA', { hour: '2-digit', minute: '2-digit', hour12: false });
-
-  if (isToday) return `Aujourd'hui à ${time}`;
-  return d.toLocaleDateString('fr-CA', { weekday: 'short', day: 'numeric', month: 'short' }) + ` à ${time}`;
-}
-
-function formatRelativeTime(iso: string): string {
-  const diff = Date.now() - new Date(iso).getTime();
-  const mins = Math.round(diff / 60_000);
-  if (mins < 1) return 'à l\'instant';
-  if (mins < 60) return `il y a ${mins} min`;
-  const hrs = Math.round(mins / 60);
-  if (hrs < 24) return `il y a ${hrs}h`;
-  return `il y a ${Math.round(hrs / 24)}j`;
 }
 
 const styles = StyleSheet.create({

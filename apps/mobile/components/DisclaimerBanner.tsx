@@ -34,7 +34,6 @@ const styles = StyleSheet.create({
     borderRadius: RADIUS.sm,
     paddingHorizontal: SPACING.sm + 2,
     paddingVertical: SPACING.xs + 2,
-    marginHorizontal: SPACING.md,
     marginBottom: SPACING.sm,
   },
   icon: {

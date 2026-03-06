@@ -29,7 +29,6 @@ export default function RootLayout() {
   const initStore = useWatchStore((s) => s.init);
   const loadSettings = useSettingsStore((s) => s.load);
   const onboardingDone = useSettingsStore((s) => s.onboardingDone);
-  const settingsLoaded = useSettingsStore((s) => s.isLoaded);
 
   useEffect(() => {
     async function init() {

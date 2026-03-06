@@ -12,6 +12,7 @@ import { getStreet, submitReport, type StreetResult } from '@/services/api';
 import { StatusBadge } from '@/components/StatusBadge';
 import { DisclaimerBanner } from '@/components/DisclaimerBanner';
 import { useWatchStore } from '@/stores/watchStore';
+import { formatDateTime, formatRelativeTime } from '@/utils/formatters';
 
 export default function StreetDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
@@ -121,9 +122,9 @@ export default function StreetDetailScreen() {
 
         {/* Stale data warning */}
         {isStaleData && (
-          <View style={[styles.staleBanner, { backgroundColor: '#FEF3C7' }]}>
-            <Ionicons name="time-outline" size={14} color="#92400E" />
-            <Text style={styles.staleText}>
+          <View style={[styles.staleBanner, { backgroundColor: C.warningBg, borderColor: C.warningBorder }]}>
+            <Ionicons name="time-outline" size={14} color={C.warningText} />
+            <Text style={[styles.staleText, { color: C.warningText }]}>
               Données potentiellement obsolètes · {lastUpdate}
             </Text>
           </View>
@@ -241,25 +242,6 @@ function TimelineItem({
   );
 }
 
-function formatDateTime(iso: string): string {
-  const d = new Date(iso);
-  const today = new Date();
-  const isToday = d.toDateString() === today.toDateString();
-  const time = d.toLocaleTimeString('fr-CA', { hour: '2-digit', minute: '2-digit', hour12: false });
-  if (isToday) return `Aujourd'hui à ${time}`;
-  return d.toLocaleDateString('fr-CA', { weekday: 'long', day: 'numeric', month: 'long' }) + ` à ${time}`;
-}
-
-function formatRelativeTime(iso: string): string {
-  const diff = Date.now() - new Date(iso).getTime();
-  const mins = Math.round(diff / 60_000);
-  if (mins < 1) return 'à l\'instant';
-  if (mins < 60) return `il y a ${mins} min`;
-  const hrs = Math.round(mins / 60);
-  if (hrs < 24) return `il y a ${hrs}h`;
-  return new Date(iso).toLocaleTimeString('fr-CA', { hour: '2-digit', minute: '2-digit' });
-}
-
 const styles = StyleSheet.create({
   container: { flex: 1 },
   scrollContent: { padding: SPACING.md, paddingBottom: SPACING['2xl'] },
@@ -300,7 +282,7 @@ const styles = StyleSheet.create({
   staleBanner: {
     flexDirection: 'row', alignItems: 'center', gap: 6,
     paddingHorizontal: SPACING.sm, paddingVertical: SPACING.xs + 2,
-    borderRadius: RADIUS.sm, marginBottom: SPACING.sm,
+    borderRadius: RADIUS.sm, marginBottom: SPACING.sm, borderWidth: 1,
   },
-  staleText: { fontSize: FONT_SIZE.xs, color: '#92400E', flex: 1 },
+  staleText: { fontSize: FONT_SIZE.xs, flex: 1 },
 });

@@ -8,21 +8,13 @@ import { Ionicons } from '@expo/vector-icons';
 import * as Location from 'expo-location';
 
 import { COLORS, SPACING, RADIUS, FONT_SIZE, BRAND, type ThemeColors } from '@/constants/colors';
+import { FALLBACK_CITIES } from '@/constants/cities';
 import { requestPermissions } from '@/services/notificationService';
 import { useSettingsStore } from '@/stores/settingsStore';
 import { CityPicker } from '@/components/CityPicker';
 import { getCities, type CityConfig } from '@/services/api';
 
 type OnboardingStep = 'city' | 'location' | 'notifications' | 'start';
-
-const FALLBACK_CITIES: CityConfig[] = [
-  { id: 'montreal',   name: 'Montréal',            nameShort: 'MTL', available: true,  bounds: { minLat: 45.4, maxLat: 45.7, minLng: -73.97, maxLng: -73.47 } },
-  { id: 'longueuil',  name: 'Longueuil / Brossard', nameShort: 'LGU', available: true,  bounds: { minLat: 45.43, maxLat: 45.62, minLng: -73.6, maxLng: -73.38 } },
-  { id: 'laval',      name: 'Laval',               nameShort: 'LAV', available: true,  bounds: { minLat: 45.49, maxLat: 45.71, minLng: -73.87, maxLng: -73.52 } },
-  { id: 'quebec',     name: 'Québec',              nameShort: 'QC',  available: true,  bounds: { minLat: 46.7, maxLat: 46.9, minLng: -71.43, maxLng: -71.1 } },
-  { id: 'gatineau',   name: 'Gatineau',            nameShort: 'GAT', available: true,  bounds: { minLat: 45.39, maxLat: 45.56, minLng: -75.92, maxLng: -75.62 } },
-  { id: 'sherbrooke', name: 'Sherbrooke',          nameShort: 'SHE', available: false, bounds: { minLat: 45.35, maxLat: 45.45, minLng: -71.98, maxLng: -71.83 } },
-];
 
 const STEPS: OnboardingStep[] = ['city', 'location', 'notifications', 'start'];
 
@@ -65,9 +57,20 @@ export default function OnboardingScreen() {
 
   const stepIndex = STEPS.indexOf(step);
 
+  function goBack() {
+    if (stepIndex > 0) setStep(STEPS[stepIndex - 1]);
+  }
+
   return (
     <SafeAreaView style={[styles.container, { backgroundColor: C.background }]}>
       <View style={styles.content}>
+        {/* Back button */}
+        {stepIndex > 0 && (
+          <TouchableOpacity onPress={goBack} style={styles.backBtn} accessibilityLabel="Retour">
+            <Ionicons name="arrow-back" size={22} color={C.text} />
+          </TouchableOpacity>
+        )}
+
         {/* Progress dots */}
         <View style={styles.dots}>
           {STEPS.map((s, i) => (
@@ -226,6 +229,10 @@ function StartStep({ C, onParked, onSearch }: { C: ThemeColors; onParked: () => 
 const styles = StyleSheet.create({
   container: { flex: 1 },
   content: { flex: 1, paddingHorizontal: SPACING.xl, justifyContent: 'center' },
+  backBtn: {
+    position: 'absolute', top: SPACING.md, left: 0, zIndex: 1,
+    width: 40, height: 40, alignItems: 'center', justifyContent: 'center',
+  },
   dots: { flexDirection: 'row', justifyContent: 'center', gap: 8, marginBottom: SPACING.xl },
   dot: { width: 8, height: 8, borderRadius: 4 },
   step: { alignItems: 'center' },

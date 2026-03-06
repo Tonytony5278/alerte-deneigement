@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import {
   View, Text, Switch, TouchableOpacity, StyleSheet, useColorScheme,
-  SafeAreaView, ScrollView, Linking, Modal, FlatList,
+  SafeAreaView, ScrollView, Linking, Modal, FlatList, Alert,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 
@@ -77,13 +77,17 @@ export default function SettingsScreen() {
   async function handleToggle(key: 'notifyOnChange' | 'notifyT60' | 'notifyT30' | 'stormAlerts', value: boolean) {
     await settings.update({ [key]: value });
     if (key !== 'stormAlerts' && watches.length > 0) {
-      await syncNotifPrefsToServer({
-        notifyOnChange: key === 'notifyOnChange' ? value : settings.notifyOnChange,
-        notifyT60: key === 'notifyT60' ? value : settings.notifyT60,
-        notifyT30: key === 'notifyT30' ? value : settings.notifyT30,
-        quietStart: settings.quietStart,
-        quietEnd: settings.quietEnd,
-      });
+      try {
+        await syncNotifPrefsToServer({
+          notifyOnChange: key === 'notifyOnChange' ? value : settings.notifyOnChange,
+          notifyT60: key === 'notifyT60' ? value : settings.notifyT60,
+          notifyT30: key === 'notifyT30' ? value : settings.notifyT30,
+          quietStart: settings.quietStart,
+          quietEnd: settings.quietEnd,
+        });
+      } catch {
+        Alert.alert('Erreur', 'Impossible de synchroniser tes préférences. Réessaie plus tard.');
+      }
     }
   }
 

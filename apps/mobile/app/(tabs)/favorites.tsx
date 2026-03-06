@@ -1,5 +1,5 @@
-import React from 'react';
-import { View, Text, FlatList, TouchableOpacity, StyleSheet, useColorScheme, SafeAreaView, Alert } from 'react-native';
+import React, { useCallback, useState } from 'react';
+import { View, Text, FlatList, TouchableOpacity, StyleSheet, useColorScheme, SafeAreaView, Alert, RefreshControl } from 'react-native';
 import { router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 
@@ -11,7 +11,17 @@ import { DisclaimerBanner } from '@/components/DisclaimerBanner';
 export default function FavoritesScreen() {
   const scheme = useColorScheme() ?? 'light';
   const C = COLORS[scheme];
-  const { watches, removeWatch, isLoading } = useWatchStore();
+  const { watches, removeWatch, isLoading, loadWatches } = useWatchStore();
+  const [refreshing, setRefreshing] = useState(false);
+
+  const onRefresh = useCallback(async () => {
+    setRefreshing(true);
+    try {
+      await loadWatches();
+    } finally {
+      setRefreshing(false);
+    }
+  }, [loadWatches]);
 
   function handleRemove(watchId: string, streetName: string) {
     Alert.alert(
@@ -34,6 +44,9 @@ export default function FavoritesScreen() {
         data={watches}
         keyExtractor={(w) => w.id}
         contentContainerStyle={styles.listContent}
+        refreshControl={
+          <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={BRAND.primary} />
+        }
         ListHeaderComponent={
           <>
             <DisclaimerBanner />
@@ -56,13 +69,15 @@ export default function FavoritesScreen() {
         }
         renderItem={({ item }) => (
           <View style={styles.watchItem}>
-            <StreetCard
-              watch={item}
-              onPress={() => router.push(`/street/${item.segment_id}`)}
-            />
+            <View style={styles.watchItemContent}>
+              <StreetCard
+                watch={item}
+                onPress={() => router.push(`/street/${item.segment_id}`)}
+              />
+            </View>
             <TouchableOpacity
               onPress={() => handleRemove(item.id, item.nom_voie ?? item.segment_id)}
-              style={[styles.removeBtn, { backgroundColor: C.surfaceElevated }]}
+              style={[styles.removeBtn, { backgroundColor: C.surfaceElevated, borderColor: C.border }]}
               accessibilityLabel="Supprimer cette surveillance"
             >
               <Ionicons name="trash-outline" size={16} color="#EF4444" />
@@ -84,11 +99,15 @@ export default function FavoritesScreen() {
 const styles = StyleSheet.create({
   container: { flex: 1 },
   listContent: { padding: SPACING.md, paddingBottom: SPACING['2xl'] },
-  watchItem: { position: 'relative', marginBottom: SPACING.xs },
+  watchItem: {
+    flexDirection: 'row', alignItems: 'center',
+    marginBottom: SPACING.xs, gap: SPACING.xs,
+  },
+  watchItemContent: { flex: 1 },
   removeBtn: {
-    position: 'absolute', top: SPACING.sm, right: SPACING.sm,
-    width: 32, height: 32, borderRadius: 16,
+    width: 36, height: 36, borderRadius: 18, borderWidth: 1,
     alignItems: 'center', justifyContent: 'center',
+    flexShrink: 0,
   },
   emptyState: { alignItems: 'center', paddingVertical: SPACING['2xl'] },
   emptyTitle: { fontSize: FONT_SIZE.lg, fontWeight: '700', marginTop: SPACING.md, marginBottom: SPACING.sm },

@@ -80,6 +80,7 @@ export const useWatchStore = create<WatchStore>((set, get) => ({
     try {
       const watch = await createWatch({
         segmentId: segment.id,
+        cityId: segment.city_id,
         pushToken,
         anonUserId,
         label: label ?? segment.nom_voie,

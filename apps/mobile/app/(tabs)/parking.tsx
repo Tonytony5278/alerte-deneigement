@@ -71,7 +71,14 @@ export default function ParkingScreen() {
                 <Text style={{ color: C.text }}>Réessayer</Text>
               </TouchableOpacity>
             </View>
-          ) : null
+          ) : (
+            <View style={styles.center}>
+              <Ionicons name="car-outline" size={40} color={C.textMuted} />
+              <Text style={[styles.errorText, { color: C.textSecondary }]}>
+                Aucun stationnement incitatif trouvé à proximité
+              </Text>
+            </View>
+          )
         }
         renderItem={({ item }) => (
           <View style={[styles.card, { backgroundColor: C.surface, borderColor: C.border }]}>
