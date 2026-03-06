@@ -5,6 +5,7 @@
   "description": "Alertes gratuites de déneigement — Montréal",
   "workspaces": [
     "apps/mobile",
+    "apps/web",
     "services/api"
   ],
   "scripts": {
