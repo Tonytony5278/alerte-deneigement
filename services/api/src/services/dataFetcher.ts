@@ -21,7 +21,7 @@ const GEOBASE_TTL_MS = 7 * 24 * 60 * 60 * 1000; // 1 week
 
 export async function fetchPlanifNeige(): Promise<FetchResult> {
   const res = await fetch(config.planifNeigeJsonUrl, {
-    headers: { 'User-Agent': 'AlerteDeneigement/1.0 (contact@alertedeneigement.ca)' },
+    headers: { 'User-Agent': 'AlerteDeneigement/1.0 (contact@alerteneige.app)' },
     signal: AbortSignal.timeout(15_000),
   });
 

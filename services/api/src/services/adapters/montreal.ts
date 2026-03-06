@@ -60,7 +60,7 @@ export class MontrealAdapter implements CityAdapter {
 
   private async fetchOpenData(): Promise<NormalizedSegment[]> {
     const res = await fetch(MTL_OPENDATA_URL, {
-      headers: { 'User-Agent': 'AlerteDeneigement/1.0 (contact@alertedeneigement.ca)' },
+      headers: { 'User-Agent': 'AlerteDeneigement/1.0 (contact@alerteneige.app)' },
       signal: AbortSignal.timeout(20_000),
     });
 
@@ -83,7 +83,7 @@ export class MontrealAdapter implements CityAdapter {
 
   private async fetchGitHubMirror(): Promise<NormalizedSegment[]> {
     const res = await fetch(config.planifNeigeJsonUrl, {
-      headers: { 'User-Agent': 'AlerteDeneigement/1.0 (contact@alertedeneigement.ca)' },
+      headers: { 'User-Agent': 'AlerteDeneigement/1.0 (contact@alerteneige.app)' },
       signal: AbortSignal.timeout(15_000),
     });
 

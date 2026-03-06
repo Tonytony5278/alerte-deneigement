@@ -6,11 +6,11 @@ export const metadata: Metadata = {
   description:
     'Reçois des alertes push gratuites 60 minutes avant le déneigement de ta rue. ' +
     'Couvre Montréal, Longueuil, Laval, Québec et Gatineau. Gratuit, sans abonnement.',
-  metadataBase: new URL('https://alertneige.app'),
+  metadataBase: new URL('https://alerteneige.app'),
   openGraph: {
     title: 'Alerte Neige',
     description: 'Alertes de déneigement gratuites pour le Québec',
-    url: 'https://alertneige.app',
+    url: 'https://alerteneige.app',
     siteName: 'Alerte Neige',
     locale: 'fr_CA',
     type: 'website',
@@ -48,7 +48,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         </header>
         <main>{children}</main>
         <footer className="mt-16 border-t border-gray-100 py-8 text-center text-sm text-gray-400">
-          <p>© {new Date().getFullYear()} Alerte Neige · <a href="mailto:info@alertneige.app" className="hover:underline">info@alertneige.app</a></p>
+          <p>© {new Date().getFullYear()} Alerte Neige · <a href="mailto:info@alerteneige.app" className="hover:underline">info@alerteneige.app</a></p>
           <p className="mt-1">La signalisation sur rue prime toujours — cet outil est fourni à titre informatif.</p>
         </footer>
       </body>

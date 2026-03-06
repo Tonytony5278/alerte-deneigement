@@ -1,4 +1,4 @@
-const API_BASE = process.env.NEXT_PUBLIC_API_URL ?? 'https://api.alertneige.app';
+const API_BASE = process.env.NEXT_PUBLIC_API_URL ?? 'https://api.alerteneige.app';
 
 export interface StreetResult {
   id: string;

@@ -211,7 +211,7 @@ export default function SettingsScreen() {
           </View>
           <TouchableOpacity
             style={[styles.row, { borderBottomColor: 'transparent' }]}
-            onPress={() => Linking.openURL('https://alertneige.app/confidentialite')}
+            onPress={() => Linking.openURL('https://alerteneige.app/confidentialite')}
             accessibilityRole="link"
           >
             <Text style={[styles.rowLabel, { color: C.text }]}>Politique de confidentialité</Text>
@@ -226,7 +226,7 @@ export default function SettingsScreen() {
           </View>
           <TouchableOpacity
             style={[styles.row, { borderBottomColor: C.border }]}
-            onPress={() => Linking.openURL('https://alertneige.app/source-donnees')}
+            onPress={() => Linking.openURL('https://alerteneige.app/source-donnees')}
             accessibilityRole="link"
           >
             <Text style={[styles.rowLabel, { color: C.text }]}>Source des données</Text>
@@ -234,7 +234,7 @@ export default function SettingsScreen() {
           </TouchableOpacity>
           <TouchableOpacity
             style={[styles.row, { borderBottomColor: 'transparent' }]}
-            onPress={() => Linking.openURL('mailto:info@alertneige.app')}
+            onPress={() => Linking.openURL('mailto:info@alerteneige.app')}
             accessibilityRole="link"
           >
             <Text style={[styles.rowLabel, { color: C.text }]}>Envoyer des commentaires</Text>

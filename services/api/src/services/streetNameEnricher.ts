@@ -154,7 +154,7 @@ export async function enrichStreetNames(cityId: string): Promise<number> {
     method: 'POST',
     headers: {
       'Content-Type': 'application/x-www-form-urlencoded',
-      'User-Agent': 'AlerteDeneigement/1.0 (contact@alertedeneigement.ca)',
+      'User-Agent': 'AlerteDeneigement/1.0 (contact@alerteneige.app)',
     },
     body: `data=${encodeURIComponent(query)}`,
     signal: AbortSignal.timeout(120_000),
