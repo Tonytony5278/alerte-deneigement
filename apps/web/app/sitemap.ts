@@ -1,5 +1,9 @@
 import type { MetadataRoute } from 'next';
 
+// Force dynamic rendering so it fetches street URLs at request time
+export const dynamic = 'force-dynamic';
+export const revalidate = 86400;
+
 const API_BASE = process.env.NEXT_PUBLIC_API_URL ?? 'https://api.alerteneige.app';
 const CITIES = ['montreal', 'longueuil', 'laval', 'quebec', 'gatineau'];
 
