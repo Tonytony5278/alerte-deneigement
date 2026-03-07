@@ -104,7 +104,7 @@ export async function streetsRoutes(app: FastifyInstance) {
                AVG(s.lat) as lat, AVG(s.lng) as lng,
                MIN(s.debut_adresse) as min_adresse,
                MAX(s.fin_adresse) as max_adresse,
-               MAX(s.type_voie) as type_voie
+               MIN(s.type_voie) as type_voie
         FROM street_segments s
         INNER JOIN street_segments_fts fts ON fts.rowid = s.rowid
         LEFT JOIN operation_statuses os ON os.segment_id = s.id
@@ -122,7 +122,7 @@ export async function streetsRoutes(app: FastifyInstance) {
                AVG(s.lat) as lat, AVG(s.lng) as lng,
                MIN(s.debut_adresse) as min_adresse,
                MAX(s.fin_adresse) as max_adresse,
-               MAX(s.type_voie) as type_voie
+               MIN(s.type_voie) as type_voie
         FROM street_segments s
         LEFT JOIN operation_statuses os ON os.segment_id = s.id
         WHERE ${filterCity ? 's.city_id = @cityId AND' : ''}
