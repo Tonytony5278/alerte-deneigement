@@ -75,40 +75,84 @@ export async function streetsRoutes(app: FastifyInstance) {
     const db = getDb();
     const filterCity = cityId && cityId !== 'all';
 
+    // Check if FTS table has data
+    const ftsAvailable = (db.prepare('SELECT COUNT(*) as c FROM street_segments_fts').get() as { c: number }).c > 0;
+
     const numMatch = q.match(/^(\d+)\s+(.*)/);
     let rows;
 
     if (numMatch) {
       const [, numStr, streetName] = numMatch;
       const num = parseInt(numStr, 10);
-      const sql = `SELECT s.*, os.etat, os.date_deb_planif, os.date_fin_planif, os.updated_at
-           FROM street_segments s
-           LEFT JOIN operation_statuses os ON os.segment_id = s.id
-           WHERE ${filterCity ? 's.city_id = @cityId AND' : ''}
-             s.nom_voie LIKE @pattern COLLATE NOCASE
-             AND (s.debut_adresse IS NULL OR s.debut_adresse <= @num)
-             AND (s.fin_adresse IS NULL OR s.fin_adresse >= @num)
-           ORDER BY s.nom_voie
-           LIMIT @limit`;
-      rows = db.prepare(sql).all({
-        ...(filterCity ? { cityId } : {}),
-        pattern: `%${streetName}%`,
-        num,
-        limit,
-      });
+      if (ftsAvailable) {
+        // FTS search with address range filter
+        const ftsQuery = `"${streetName.replace(/"/g, '""')}"*`;
+        const sql = `SELECT s.*, os.etat, os.date_deb_planif, os.date_fin_planif, os.updated_at
+             FROM street_segments s
+             INNER JOIN street_segments_fts fts ON fts.rowid = s.rowid
+             LEFT JOIN operation_statuses os ON os.segment_id = s.id
+             WHERE fts.nom_voie MATCH @ftsQuery
+               ${filterCity ? 'AND s.city_id = @cityId' : ''}
+               AND (s.debut_adresse IS NULL OR s.debut_adresse <= @num)
+               AND (s.fin_adresse IS NULL OR s.fin_adresse >= @num)
+             ORDER BY rank
+             LIMIT @limit`;
+        rows = db.prepare(sql).all({
+          ftsQuery,
+          ...(filterCity ? { cityId } : {}),
+          num,
+          limit,
+        });
+      } else {
+        // Fallback to LIKE
+        const sql = `SELECT s.*, os.etat, os.date_deb_planif, os.date_fin_planif, os.updated_at
+             FROM street_segments s
+             LEFT JOIN operation_statuses os ON os.segment_id = s.id
+             WHERE ${filterCity ? 's.city_id = @cityId AND' : ''}
+               s.nom_voie LIKE @pattern COLLATE NOCASE
+               AND (s.debut_adresse IS NULL OR s.debut_adresse <= @num)
+               AND (s.fin_adresse IS NULL OR s.fin_adresse >= @num)
+             ORDER BY s.nom_voie
+             LIMIT @limit`;
+        rows = db.prepare(sql).all({
+          ...(filterCity ? { cityId } : {}),
+          pattern: `%${streetName}%`,
+          num,
+          limit,
+        });
+      }
     } else {
-      const sql = `SELECT s.*, os.etat, os.date_deb_planif, os.date_fin_planif, os.updated_at
-           FROM street_segments s
-           LEFT JOIN operation_statuses os ON os.segment_id = s.id
-           WHERE ${filterCity ? 's.city_id = @cityId AND' : ''}
-             s.nom_voie LIKE @pattern COLLATE NOCASE
-           ORDER BY s.nom_voie
-           LIMIT @limit`;
-      rows = db.prepare(sql).all({
-        ...(filterCity ? { cityId } : {}),
-        pattern: `%${q}%`,
-        limit,
-      });
+      if (ftsAvailable) {
+        // FTS search — append * for prefix matching
+        const ftsQuery = `"${q.replace(/"/g, '""')}"*`;
+        const sql = `SELECT s.*, os.etat, os.date_deb_planif, os.date_fin_planif, os.updated_at
+             FROM street_segments s
+             INNER JOIN street_segments_fts fts ON fts.rowid = s.rowid
+             LEFT JOIN operation_statuses os ON os.segment_id = s.id
+             WHERE fts.nom_voie MATCH @ftsQuery
+               ${filterCity ? 'AND s.city_id = @cityId' : ''}
+             ORDER BY rank
+             LIMIT @limit`;
+        rows = db.prepare(sql).all({
+          ftsQuery,
+          ...(filterCity ? { cityId } : {}),
+          limit,
+        });
+      } else {
+        // Fallback to LIKE
+        const sql = `SELECT s.*, os.etat, os.date_deb_planif, os.date_fin_planif, os.updated_at
+             FROM street_segments s
+             LEFT JOIN operation_statuses os ON os.segment_id = s.id
+             WHERE ${filterCity ? 's.city_id = @cityId AND' : ''}
+               s.nom_voie LIKE @pattern COLLATE NOCASE
+             ORDER BY s.nom_voie
+             LIMIT @limit`;
+        rows = db.prepare(sql).all({
+          ...(filterCity ? { cityId } : {}),
+          pattern: `%${q}%`,
+          limit,
+        });
+      }
     }
 
     const results = (rows as Array<Record<string, unknown>>).map((row) => ({

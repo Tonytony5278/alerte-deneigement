@@ -147,7 +147,35 @@ function applyMigrations(db: Database.Database): void {
   // Composite index for cross-city street name search
   db.exec(`CREATE INDEX IF NOT EXISTS idx_segments_nom_city ON street_segments(nom_voie COLLATE NOCASE, city_id)`);
 
+  // FTS5 virtual table for fast full-text street name search
+  db.exec(`CREATE VIRTUAL TABLE IF NOT EXISTS street_segments_fts USING fts5(
+    nom_voie,
+    content='street_segments',
+    content_rowid='rowid',
+    tokenize='unicode61 remove_diacritics 2'
+  )`);
+  rebuildFtsIfNeeded(db);
+
   db.exec(`CREATE TABLE IF NOT EXISTS cities (id TEXT PRIMARY KEY, name TEXT NOT NULL, available INTEGER NOT NULL DEFAULT 1)`);
+}
+
+/**
+ * Rebuild FTS index if it's empty but the main table has data.
+ * Also called after data syncs to keep FTS in sync.
+ */
+export function rebuildFts(): void {
+  const d = db ?? getDb();
+  d.exec(`INSERT INTO street_segments_fts(street_segments_fts) VALUES('rebuild')`);
+}
+
+function rebuildFtsIfNeeded(d: Database.Database): void {
+  const ftsCount = (d.prepare('SELECT COUNT(*) as c FROM street_segments_fts').get() as { c: number }).c;
+  const mainCount = (d.prepare('SELECT COUNT(*) as c FROM street_segments').get() as { c: number }).c;
+  if (mainCount > 0 && ftsCount === 0) {
+    console.log(`[DB] Rebuilding FTS index (${mainCount} segments)...`);
+    d.exec(`INSERT INTO street_segments_fts(street_segments_fts) VALUES('rebuild')`);
+    console.log('[DB] FTS index rebuilt');
+  }
 }
 
 export function closeDb(): void {

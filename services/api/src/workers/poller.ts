@@ -4,7 +4,7 @@ import { syncCity, syncGeobase, syncGeobaseGeometry } from '../services/dataFetc
 import { notifyStatusChange, notifyScheduledReminders } from '../services/notificationService';
 import { enrichAllStreetNames } from '../services/streetNameEnricher';
 import { CITY_ADAPTERS } from '../services/cityRegistry';
-import { getDb } from '../db';
+import { getDb, rebuildFts } from '../db';
 import { v4 as uuidv4 } from 'uuid';
 
 let isPolling = false;
@@ -139,6 +139,14 @@ async function initGeobase() {
     await enrichAllStreetNames();
   } catch (err) {
     console.error('[StreetNames] Enrichment error (non-fatal):', err);
+  }
+
+  // Rebuild FTS index after all name enrichment is done
+  try {
+    rebuildFts();
+    console.log('[FTS] Search index rebuilt');
+  } catch (err) {
+    console.error('[FTS] Rebuild error (non-fatal):', err);
   }
 }
 
