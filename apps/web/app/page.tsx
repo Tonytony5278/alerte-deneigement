@@ -65,7 +65,7 @@ export default async function HomePage() {
       <section id="chercher" className="max-w-2xl mx-auto px-4 py-12">
         <h2 className="text-2xl font-bold text-center mb-2">Vérifier le statut d'une rue</h2>
         <p className="text-gray-500 text-center text-sm mb-8">Cherche une adresse pour voir si le déneigement est planifié.</p>
-        <SearchSection cities={cities} />
+        <SearchSection />
       </section>
 
       {/* Features */}

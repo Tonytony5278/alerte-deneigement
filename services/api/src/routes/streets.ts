@@ -33,10 +33,18 @@ function computeTowing(etat: number | null, dateDebPlanif: string | null): Towin
   return { towing_status: 'none', towing_label: null };
 }
 
+const CITY_NAMES: Record<string, string> = {
+  montreal: 'Montréal',
+  longueuil: 'Longueuil',
+  laval: 'Laval',
+  quebec: 'Québec',
+  gatineau: 'Gatineau',
+};
+
 const SearchQuerySchema = z.object({
   q: z.string().min(2).max(100),
-  cityId: z.string().min(1).max(20).default('montreal'),
-  limit: z.coerce.number().int().min(1).max(20).default(10),
+  cityId: z.string().max(20).default(''),
+  limit: z.coerce.number().int().min(1).max(50).default(15),
 });
 
 const NearbyQuerySchema = z.object({
@@ -65,6 +73,7 @@ export async function streetsRoutes(app: FastifyInstance) {
 
     const { q, cityId, limit } = parsed.data;
     const db = getDb();
+    const filterCity = cityId && cityId !== 'all';
 
     const numMatch = q.match(/^(\d+)\s+(.*)/);
     let rows;
@@ -72,36 +81,40 @@ export async function streetsRoutes(app: FastifyInstance) {
     if (numMatch) {
       const [, numStr, streetName] = numMatch;
       const num = parseInt(numStr, 10);
-      rows = db
-        .prepare(
-          `SELECT s.*, os.etat, os.date_deb_planif, os.date_fin_planif, os.updated_at
+      const sql = `SELECT s.*, os.etat, os.date_deb_planif, os.date_fin_planif, os.updated_at
            FROM street_segments s
            LEFT JOIN operation_statuses os ON os.segment_id = s.id
-           WHERE s.city_id = ?
-             AND s.nom_voie LIKE ? COLLATE NOCASE
-             AND (s.debut_adresse IS NULL OR s.debut_adresse <= ?)
-             AND (s.fin_adresse IS NULL OR s.fin_adresse >= ?)
+           WHERE ${filterCity ? 's.city_id = @cityId AND' : ''}
+             s.nom_voie LIKE @pattern COLLATE NOCASE
+             AND (s.debut_adresse IS NULL OR s.debut_adresse <= @num)
+             AND (s.fin_adresse IS NULL OR s.fin_adresse >= @num)
            ORDER BY s.nom_voie
-           LIMIT ?`
-        )
-        .all(cityId, `%${streetName}%`, num, num, limit);
+           LIMIT @limit`;
+      rows = db.prepare(sql).all({
+        ...(filterCity ? { cityId } : {}),
+        pattern: `%${streetName}%`,
+        num,
+        limit,
+      });
     } else {
-      rows = db
-        .prepare(
-          `SELECT s.*, os.etat, os.date_deb_planif, os.date_fin_planif, os.updated_at
+      const sql = `SELECT s.*, os.etat, os.date_deb_planif, os.date_fin_planif, os.updated_at
            FROM street_segments s
            LEFT JOIN operation_statuses os ON os.segment_id = s.id
-           WHERE s.city_id = ?
-             AND s.nom_voie LIKE ? COLLATE NOCASE
+           WHERE ${filterCity ? 's.city_id = @cityId AND' : ''}
+             s.nom_voie LIKE @pattern COLLATE NOCASE
            ORDER BY s.nom_voie
-           LIMIT ?`
-        )
-        .all(cityId, `%${q}%`, limit);
+           LIMIT @limit`;
+      rows = db.prepare(sql).all({
+        ...(filterCity ? { cityId } : {}),
+        pattern: `%${q}%`,
+        limit,
+      });
     }
 
     const results = (rows as Array<Record<string, unknown>>).map((row) => ({
       ...row,
       etat_label: etatLabel(row.etat as number | null),
+      city_name: CITY_NAMES[row.city_id as string] ?? (row.city_id as string),
       ...computeTowing(row.etat as number | null, row.date_deb_planif as string | null),
     }));
 

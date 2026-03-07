@@ -13,6 +13,7 @@ export interface StreetResult {
   lng: number | null;
   etat: number | null;
   etat_label: string;
+  city_name?: string;
   date_deb_planif: string | null;
   date_fin_planif: string | null;
   updated_at: string | null;
@@ -46,10 +47,10 @@ export interface SearchResult {
   error?: string;
 }
 
-export async function searchStreets(q: string, cityId = 'montreal', limit = 8): Promise<SearchResult> {
+export async function searchStreets(q: string, limit = 15): Promise<SearchResult> {
   try {
     const res = await fetch(
-      `${API_BASE}/api/streets/search?q=${encodeURIComponent(q)}&cityId=${encodeURIComponent(cityId)}&limit=${limit}`,
+      `${API_BASE}/api/streets/search?q=${encodeURIComponent(q)}&limit=${limit}`,
       { cache: 'no-store' }
     );
     if (!res.ok) return { data: [], error: `Erreur serveur (${res.status})` };

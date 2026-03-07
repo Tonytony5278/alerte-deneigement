@@ -144,6 +144,9 @@ function applyMigrations(db: Database.Database): void {
   // Spatial-ish index for bounding box queries
   db.exec(`CREATE INDEX IF NOT EXISTS idx_segments_lat_lng ON street_segments(city_id, lat, lng)`);
 
+  // Composite index for cross-city street name search
+  db.exec(`CREATE INDEX IF NOT EXISTS idx_segments_nom_city ON street_segments(nom_voie COLLATE NOCASE, city_id)`);
+
   db.exec(`CREATE TABLE IF NOT EXISTS cities (id TEXT PRIMARY KEY, name TEXT NOT NULL, available INTEGER NOT NULL DEFAULT 1)`);
 }
 
