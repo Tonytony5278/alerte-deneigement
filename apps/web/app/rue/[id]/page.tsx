@@ -71,6 +71,31 @@ function StreetOverview({ street }: { street: Awaited<ReturnType<typeof getStree
       })
     : null;
 
+  const dataAgeMinutes = latestUpdate
+    ? (Date.now() - new Date(latestUpdate).getTime()) / 60_000
+    : null;
+  const isStale = dataAgeMinutes !== null && dataAgeMinutes > 30;
+
+  // Find earliest planned start and latest planned end across all segments
+  let earliestPlanif: string | null = null;
+  let latestPlanifEnd: string | null = null;
+  for (const seg of street.segments) {
+    if (seg.date_deb_planif && (!earliestPlanif || seg.date_deb_planif < earliestPlanif)) {
+      earliestPlanif = seg.date_deb_planif;
+    }
+    if (seg.date_fin_planif && (!latestPlanifEnd || seg.date_fin_planif > latestPlanifEnd)) {
+      latestPlanifEnd = seg.date_fin_planif;
+    }
+  }
+
+  function formatDate(iso: string | null): string {
+    if (!iso) return '\u2014';
+    return new Date(iso).toLocaleString('fr-CA', {
+      weekday: 'short', month: 'short', day: 'numeric',
+      hour: '2-digit', minute: '2-digit',
+    });
+  }
+
   return (
     <main className="max-w-4xl mx-auto px-4 py-10">
       <Link
@@ -79,6 +104,12 @@ function StreetOverview({ street }: { street: Awaited<ReturnType<typeof getStree
       >
         &larr; Retour
       </Link>
+
+      {isStale && (
+        <div className="bg-amber-50 border border-amber-200 rounded-xl px-4 py-3 text-sm text-amber-800 mb-4">
+          Ces donn&eacute;es datent de {Math.round(dataAgeMinutes!)} min. Rafra&icirc;chis la page pour voir le statut le plus r&eacute;cent.
+        </div>
+      )}
 
       <div className="flex items-start justify-between mb-4">
         <div>
@@ -107,6 +138,14 @@ function StreetOverview({ street }: { street: Awaited<ReturnType<typeof getStree
           height="450px"
         />
       </div>
+
+      {/* Planned dates */}
+      {(earliestPlanif || latestPlanifEnd) && (
+        <div className="bg-white border border-gray-100 rounded-2xl shadow-sm divide-y divide-gray-100 mb-6">
+          {earliestPlanif && <Row label="D&eacute;but planifi&eacute;" value={formatDate(earliestPlanif)} />}
+          {latestPlanifEnd && <Row label="Fin planifi&eacute;e" value={formatDate(latestPlanifEnd)} />}
+        </div>
+      )}
 
       {/* Status breakdown */}
       {Object.keys(statusCounts).length <= 1 ? (
