@@ -75,9 +75,8 @@ export async function streetsRoutes(app: FastifyInstance) {
     const db = getDb();
     const filterCity = cityId && cityId !== 'all';
 
-    // Check if FTS table has data
-    const ftsCount = (db.prepare('SELECT COUNT(*) as c FROM street_segments_fts').get() as { c: number }).c;
-    const ftsAvailable = ftsCount > 0;
+    // Quick existence check (LIMIT 1 is instant vs COUNT(*) which scans entire FTS table)
+    const ftsAvailable = !!(db.prepare('SELECT rowid FROM street_segments_fts LIMIT 1').get());
 
     const numMatch = q.match(/^(\d+)\s+(.*)/);
     let rows;
@@ -88,7 +87,9 @@ export async function streetsRoutes(app: FastifyInstance) {
       if (ftsAvailable) {
         // FTS search with address range filter
         const ftsQuery = `"${streetName.replace(/"/g, '""')}"*`;
-        const sql = `SELECT s.*, os.etat, os.date_deb_planif, os.date_fin_planif, os.updated_at
+        const sql = `SELECT s.id, s.city_id, s.nom_voie, s.type_voie, s.debut_adresse, s.fin_adresse,
+                    s.cote, s.arrondissement, s.lat, s.lng,
+                    os.etat, os.date_deb_planif, os.date_fin_planif, os.updated_at
              FROM street_segments s
              INNER JOIN street_segments_fts fts ON fts.rowid = s.rowid
              LEFT JOIN operation_statuses os ON os.segment_id = s.id
@@ -106,7 +107,9 @@ export async function streetsRoutes(app: FastifyInstance) {
         });
       } else {
         // Fallback to LIKE
-        const sql = `SELECT s.*, os.etat, os.date_deb_planif, os.date_fin_planif, os.updated_at
+        const sql = `SELECT s.id, s.city_id, s.nom_voie, s.type_voie, s.debut_adresse, s.fin_adresse,
+                    s.cote, s.arrondissement, s.lat, s.lng,
+                    os.etat, os.date_deb_planif, os.date_fin_planif, os.updated_at
              FROM street_segments s
              LEFT JOIN operation_statuses os ON os.segment_id = s.id
              WHERE ${filterCity ? 's.city_id = @cityId AND' : ''}
@@ -126,7 +129,9 @@ export async function streetsRoutes(app: FastifyInstance) {
       if (ftsAvailable) {
         // FTS search — append * for prefix matching
         const ftsQuery = `"${q.replace(/"/g, '""')}"*`;
-        const sql = `SELECT s.*, os.etat, os.date_deb_planif, os.date_fin_planif, os.updated_at
+        const sql = `SELECT s.id, s.city_id, s.nom_voie, s.type_voie, s.debut_adresse, s.fin_adresse,
+                    s.cote, s.arrondissement, s.lat, s.lng,
+                    os.etat, os.date_deb_planif, os.date_fin_planif, os.updated_at
              FROM street_segments s
              INNER JOIN street_segments_fts fts ON fts.rowid = s.rowid
              LEFT JOIN operation_statuses os ON os.segment_id = s.id
@@ -141,7 +146,9 @@ export async function streetsRoutes(app: FastifyInstance) {
         });
       } else {
         // Fallback to LIKE
-        const sql = `SELECT s.*, os.etat, os.date_deb_planif, os.date_fin_planif, os.updated_at
+        const sql = `SELECT s.id, s.city_id, s.nom_voie, s.type_voie, s.debut_adresse, s.fin_adresse,
+                    s.cote, s.arrondissement, s.lat, s.lng,
+                    os.etat, os.date_deb_planif, os.date_fin_planif, os.updated_at
              FROM street_segments s
              LEFT JOIN operation_statuses os ON os.segment_id = s.id
              WHERE ${filterCity ? 's.city_id = @cityId AND' : ''}

@@ -71,7 +71,8 @@ async function bootstrap() {
           (SELECT COUNT(*) FROM street_segments) AS segments,
           (SELECT COUNT(*) FROM operation_statuses) AS statuses,
           (SELECT COUNT(*) FROM user_watches) AS watches,
-          (SELECT COUNT(*) FROM street_segments_fts) AS fts_rows
+          (SELECT COUNT(*) FROM street_segments_fts) AS fts_rows,
+          CASE WHEN EXISTS(SELECT 1 FROM street_segments_fts LIMIT 1) THEN 1 ELSE 0 END AS fts_available
       `)
       .get() as { segments: number; statuses: number; watches: number; fts_rows: number };
 
