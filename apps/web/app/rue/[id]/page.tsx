@@ -55,10 +55,20 @@ function StreetOverview({ street }: { street: Awaited<ReturnType<typeof getStree
   const meta = STATUS_META[street.worst_etat ?? 0] ?? STATUS_META[0];
 
   const statusCounts: Record<number, number> = {};
+  let latestUpdate: string | null = null;
   for (const seg of street.segments) {
     const etat = seg.etat ?? 0;
     statusCounts[etat] = (statusCounts[etat] || 0) + 1;
+    if (seg.updated_at && (!latestUpdate || seg.updated_at > latestUpdate)) {
+      latestUpdate = seg.updated_at;
+    }
   }
+
+  const updatedLabel = latestUpdate
+    ? new Date(latestUpdate).toLocaleString('fr-CA', {
+        day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit',
+      })
+    : null;
 
   return (
     <main className="max-w-4xl mx-auto px-4 py-10">
@@ -74,7 +84,10 @@ function StreetOverview({ street }: { street: Awaited<ReturnType<typeof getStree
           <h1 className="text-2xl font-extrabold text-gray-900">
             {street.type_voie ? `${street.type_voie} ` : ''}{street.nom_voie}
           </h1>
-          <p className="text-gray-500 text-sm">{street.city_name} &middot; {street.segment_count} segments</p>
+          <p className="text-gray-500 text-sm">
+            {street.city_name} &middot; {street.segment_count} segments
+            {updatedLabel && <> &middot; mis &agrave; jour {updatedLabel}</>}
+          </p>
         </div>
         <span
           className="text-sm font-bold px-4 py-2 rounded-xl flex-shrink-0"

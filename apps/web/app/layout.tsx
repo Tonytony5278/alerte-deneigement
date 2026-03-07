@@ -2,6 +2,9 @@ import type { Metadata } from 'next';
 import './globals.css';
 
 export const metadata: Metadata = {
+  icons: {
+    icon: '/favicon.svg',
+  },
   title: 'Alerte Neige — Déneigement gratuit pour le Québec',
   description:
     'Reçois des alertes push gratuites 60 minutes avant le déneigement de ta rue. ' +

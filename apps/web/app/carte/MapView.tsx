@@ -4,8 +4,14 @@ import { useState, useCallback, useRef, useEffect } from 'react';
 import { MapContainer, TileLayer, Polyline, Popup, useMapEvents, useMap } from 'react-leaflet';
 import { useSearchParams } from 'next/navigation';
 import 'leaflet/dist/leaflet.css';
-import type { LatLngExpression } from 'leaflet';
+import type { LatLngExpression, LatLngBoundsExpression } from 'leaflet';
 import { STATUS_META, STATUS_COLORS } from '@/lib/api';
+
+// Bounding box covering all served regions (MTL, LGL, LAV, QC, GAT) with padding
+const QUEBEC_BOUNDS: LatLngBoundsExpression = [
+  [44.8, -76.5], // SW corner (south of Gatineau, west)
+  [47.5, -70.5], // NE corner (north of Québec City, east)
+];
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL ?? 'https://api.alerteneige.app';
 
@@ -206,6 +212,9 @@ export default function MapView() {
         <MapContainer
           center={initialCenter}
           zoom={isStreetMode ? 15 : 13}
+          minZoom={10}
+          maxBounds={QUEBEC_BOUNDS}
+          maxBoundsViscosity={0.8}
           style={{ height: '100%', width: '100%' }}
           className="z-0"
         >
