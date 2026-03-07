@@ -30,17 +30,15 @@ jobs:
       - name: Create deployment package
         run: |
           mkdir -p /tmp/deploy
-          # Standalone output in monorepo nests under apps/web/
-          if [ -d apps/web/.next/standalone/apps/web ]; then
-            cp -r apps/web/.next/standalone/apps/web/* /tmp/deploy/
-            # Copy shared node_modules from standalone root
-            cp -r apps/web/.next/standalone/node_modules /tmp/deploy/node_modules 2>/dev/null || true
-          else
-            cp -r apps/web/.next/standalone/* /tmp/deploy/
-          fi
-          mkdir -p /tmp/deploy/.next
-          cp -r apps/web/.next/static /tmp/deploy/.next/static
-          cp -r apps/web/public /tmp/deploy/public 2>/dev/null || true
+          # Copy entire standalone output (preserves monorepo path structure)
+          cp -r apps/web/.next/standalone/* /tmp/deploy/
+          # Copy static assets into the app's .next directory
+          mkdir -p /tmp/deploy/apps/web/.next
+          cp -r apps/web/.next/static /tmp/deploy/apps/web/.next/static
+          cp -r apps/web/public /tmp/deploy/apps/web/public 2>/dev/null || true
+          # Debug: show structure
+          echo "=== Deploy package structure ==="
+          find /tmp/deploy -maxdepth 3 -type f | head -30
           cd /tmp/deploy
           zip -r $GITHUB_WORKSPACE/deploy.zip .
 
@@ -71,7 +69,6 @@ jobs:
             --resource-group alerte-neige-rg \
             --src-path deploy.zip \
             --type zip \
-            --clean true \
             --timeout 300
 
       - name: Health check
