@@ -30,23 +30,15 @@ jobs:
       - name: Create deployment package
         run: |
           mkdir -p /tmp/deploy
-          # Copy standalone output (server.js + .next/server/)
+          # Copy standalone output (server.js + .next/)
           cp -r apps/web/.next/standalone/. /tmp/deploy/
-          # Static assets are not included in standalone — copy them in
+          # Static assets are not included in standalone
           cp -r apps/web/.next/static /tmp/deploy/.next/static
           cp -r apps/web/public /tmp/deploy/public 2>/dev/null || true
-          # In monorepo, node_modules are hoisted — standalone doesn't include them
-          # Install production deps for next standalone server
-          if [ ! -d /tmp/deploy/node_modules ]; then
-            cd /tmp/deploy
-            npm install --omit=dev
-            cd $GITHUB_WORKSPACE
-          fi
           # Verify key files
           echo "server.js: $(test -f /tmp/deploy/server.js && echo OK || echo MISSING)"
           echo ".next/server: $(test -d /tmp/deploy/.next/server && echo OK || echo MISSING)"
           echo ".next/static: $(test -d /tmp/deploy/.next/static && echo OK || echo MISSING)"
-          echo "node_modules/next: $(test -d /tmp/deploy/node_modules/next && echo OK || echo MISSING)"
           cd /tmp/deploy
           zip -r $GITHUB_WORKSPACE/deploy.zip .
 
@@ -71,17 +63,14 @@ jobs:
           creds: ${{ secrets.AZURE_CREDENTIALS }}
 
       - name: Deploy to Azure Web App
-        run: |
-          az webapp deploy \
-            --name alerte-neige-web \
-            --resource-group alerte-neige-rg \
-            --src-path deploy.zip \
-            --type zip \
-            --timeout 300
+        uses: azure/webapps-deploy@v3
+        with:
+          app-name: alerte-neige-web
+          package: deploy.zip
 
       - name: Health check
         run: |
-          sleep 30
+          sleep 60
           for i in 1 2 3 4 5; do
             if curl -sf https://alerteneige.app > /dev/null; then
               echo "Web app is healthy!"
