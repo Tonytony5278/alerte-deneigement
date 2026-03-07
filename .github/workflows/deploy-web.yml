@@ -30,15 +30,17 @@ jobs:
       - name: Create deployment package
         run: |
           mkdir -p /tmp/deploy
-          # Copy entire standalone output (preserves monorepo path structure)
+          # Copy entire standalone output (preserves monorepo structure with node_modules + server bundles)
           cp -r apps/web/.next/standalone/* /tmp/deploy/
-          # Copy static assets into the app's .next directory
-          mkdir -p /tmp/deploy/apps/web/.next
+          # Copy static assets (not included in standalone output)
           cp -r apps/web/.next/static /tmp/deploy/apps/web/.next/static
           cp -r apps/web/public /tmp/deploy/apps/web/public 2>/dev/null || true
-          # Debug: show structure
-          echo "=== Deploy package structure ==="
-          find /tmp/deploy -maxdepth 3 -type f | head -30
+          # Debug: show key files exist
+          echo "=== Key files ==="
+          ls -la /tmp/deploy/server.js /tmp/deploy/node_modules 2>/dev/null || true
+          ls -la /tmp/deploy/apps/web/.next/server 2>/dev/null || echo "WARN: no apps/web/.next/server"
+          ls -la /tmp/deploy/apps/web/node_modules 2>/dev/null || echo "WARN: no apps/web/node_modules"
+          find /tmp/deploy -maxdepth 4 -name "*.js" | head -20
           cd /tmp/deploy
           zip -r $GITHUB_WORKSPACE/deploy.zip .
 
