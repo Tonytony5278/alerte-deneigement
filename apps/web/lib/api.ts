@@ -80,8 +80,8 @@ export const STATUS_META: Record<number, { label: string; color: string; bg: str
 };
 
 export const STATUS_COLORS: Record<number, string> = {
-  0: '#9CA3AF',
-  1: '#6B7280',
+  0: '#94A3B8',
+  1: '#3B82F6',
   2: '#EA580C',
   3: '#DC2626',
   4: '#16A34A',

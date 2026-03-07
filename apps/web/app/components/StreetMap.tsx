@@ -5,8 +5,8 @@ import 'leaflet/dist/leaflet.css';
 import type { LatLngExpression } from 'leaflet';
 
 const STATUS_COLORS: Record<number, string> = {
-  0: '#9CA3AF',
-  1: '#6B7280',
+  0: '#94A3B8',
+  1: '#3B82F6',
   2: '#EA580C',
   3: '#DC2626',
   4: '#16A34A',
@@ -51,7 +51,7 @@ export default function StreetMap({ segments, center, zoom = 15, height = '400px
           <Polyline
             key={seg.id}
             positions={positions}
-            pathOptions={{ color, weight: 5, opacity: 0.85 }}
+            pathOptions={{ color, weight: 6, opacity: 0.9 }}
           >
             <Popup>
               <div className="text-sm">

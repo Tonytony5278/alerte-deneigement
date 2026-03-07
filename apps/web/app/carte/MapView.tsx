@@ -45,7 +45,7 @@ function SegmentLayer({ segments }: { segments: MapSeg[] }) {
           <Polyline
             key={seg.id}
             positions={positions}
-            pathOptions={{ color, weight: 4, opacity: 0.8 }}
+            pathOptions={{ color, weight: 5, opacity: 0.85 }}
           >
             <Popup>
               <div className="text-sm">

@@ -94,50 +94,68 @@ function StreetOverview({ street }: { street: Awaited<ReturnType<typeof getStree
         />
       </div>
 
-      {/* Legend */}
-      <div className="flex flex-wrap gap-3 mb-6">
-        {Object.entries(statusCounts)
-          .sort(([a], [b]) => Number(a) - Number(b))
-          .map(([etat, count]) => {
-            const m = STATUS_META[Number(etat)] ?? STATUS_META[0];
-            return (
-              <div key={etat} className="flex items-center gap-1.5 text-xs">
-                <span
-                  className="w-3 h-3 rounded-full"
-                  style={{ backgroundColor: m.bg, border: `2px solid ${m.color}` }}
-                />
-                <span className="text-gray-600">{m.label} ({count})</span>
-              </div>
-            );
-          })}
-      </div>
+      {/* Status breakdown */}
+      {Object.keys(statusCounts).length <= 1 ? (
+        <div className="bg-white border border-gray-100 rounded-2xl shadow-sm px-5 py-4 mb-8">
+          <p className="text-sm text-gray-600">
+            {street.segment_count} segments &mdash; tous <strong style={{ color: meta.color }}>{meta.label.toLowerCase()}</strong>
+          </p>
+        </div>
+      ) : (
+        <>
+          <div className="flex flex-wrap gap-3 mb-4">
+            {Object.entries(statusCounts)
+              .sort(([a], [b]) => Number(a) - Number(b))
+              .map(([etat, count]) => {
+                const m = STATUS_META[Number(etat)] ?? STATUS_META[0];
+                return (
+                  <div key={etat} className="flex items-center gap-1.5 text-xs">
+                    <span
+                      className="w-3 h-3 rounded-full"
+                      style={{ backgroundColor: m.bg, border: `2px solid ${m.color}` }}
+                    />
+                    <span className="text-gray-600">{m.label} ({count})</span>
+                  </div>
+                );
+              })}
+          </div>
 
-      {/* Segments table */}
-      <div className="bg-white border border-gray-100 rounded-2xl shadow-sm overflow-hidden mb-8">
-        <div className="px-4 py-3 bg-gray-50 border-b border-gray-100">
-          <h2 className="text-sm font-semibold text-gray-700">D&eacute;tails par segment</h2>
-        </div>
-        <div className="divide-y divide-gray-50 max-h-96 overflow-y-auto">
-          {street.segments.map((seg) => {
-            const segMeta = STATUS_META[seg.etat ?? 0] ?? STATUS_META[0];
-            return (
-              <div key={seg.id} className="flex items-center justify-between px-4 py-2.5 text-sm">
-                <div>
-                  <span className="text-gray-700">
-                    {seg.debut_adresse ? `${seg.debut_adresse}\u2013${seg.fin_adresse}` : '\u2014'}
-                  </span>
-                  {seg.cote && <span className="text-gray-400 ml-2">({seg.cote})</span>}
-                </div>
-                <span
-                  className="text-xs font-semibold px-2 py-0.5 rounded-full"
-                  style={{ color: segMeta.color, backgroundColor: segMeta.bg }}
-                >
-                  {segMeta.label}
-                </span>
-              </div>
-            );
-          })}
-        </div>
+          <div className="bg-white border border-gray-100 rounded-2xl shadow-sm overflow-hidden mb-8">
+            <div className="px-4 py-3 bg-gray-50 border-b border-gray-100">
+              <h2 className="text-sm font-semibold text-gray-700">D&eacute;tails par segment</h2>
+            </div>
+            <div className="divide-y divide-gray-50 max-h-96 overflow-y-auto">
+              {street.segments.map((seg) => {
+                const segMeta = STATUS_META[seg.etat ?? 0] ?? STATUS_META[0];
+                return (
+                  <div key={seg.id} className="flex items-center justify-between px-4 py-2.5 text-sm">
+                    <div>
+                      <span className="text-gray-700">
+                        {seg.debut_adresse ? `${seg.debut_adresse}\u2013${seg.fin_adresse}` : seg.cote ?? '\u2014'}
+                      </span>
+                      {seg.debut_adresse && seg.cote && <span className="text-gray-400 ml-2">({seg.cote})</span>}
+                    </div>
+                    <span
+                      className="text-xs font-semibold px-2 py-0.5 rounded-full"
+                      style={{ color: segMeta.color, backgroundColor: segMeta.bg }}
+                    >
+                      {segMeta.label}
+                    </span>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        </>
+      )}
+
+      <div className="mb-8">
+        <Link
+          href={`/carte?street=${encodeURIComponent(street.nom_voie)}&city=${street.city_id}`}
+          className="inline-flex items-center gap-2 text-sm font-medium text-brand-primary hover:underline"
+        >
+          Voir sur la carte interactive &rarr;
+        </Link>
       </div>
 
       <DownloadCTA />
