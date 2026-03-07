@@ -2,11 +2,11 @@
 
 import { useState, useRef, useCallback } from 'react';
 import Link from 'next/link';
-import { searchStreets, STATUS_META, type StreetResult } from '@/lib/api';
+import { searchStreetsGrouped, STATUS_META, type GroupedStreetResult } from '@/lib/api';
 
 export function SearchSection() {
   const [query, setQuery] = useState('');
-  const [results, setResults] = useState<StreetResult[]>([]);
+  const [results, setResults] = useState<GroupedStreetResult[]>([]);
   const [loading, setLoading] = useState(false);
   const [searched, setSearched] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -24,7 +24,7 @@ export function SearchSection() {
     setLoading(true);
     timerRef.current = setTimeout(async () => {
       try {
-        const result = await searchStreets(text);
+        const result = await searchStreetsGrouped(text);
         setResults(result.data);
         setError(result.error ?? null);
         setSearched(true);
@@ -54,7 +54,7 @@ export function SearchSection() {
           type="text"
           value={query}
           onChange={(e) => handleChange(e.target.value)}
-          placeholder="Ex: Fullum, Saint-Denis, Boul. Laurier…"
+          placeholder="Ex: Fullum, Saint-Denis, Boul. Laurier..."
           className="w-full pl-10 pr-4 py-3 border border-gray-200 rounded-xl text-base focus:outline-none focus:ring-2 focus:ring-brand-primary focus:border-transparent shadow-sm"
         />
       </div>
@@ -63,21 +63,20 @@ export function SearchSection() {
       {results.length > 0 && (
         <ul className="divide-y divide-gray-100 border border-gray-100 rounded-xl overflow-hidden shadow-sm bg-white">
           {results.map((r) => {
-            const meta = STATUS_META[r.etat ?? 0] ?? STATUS_META[0];
+            const meta = STATUS_META[r.worst_etat ?? 0] ?? STATUS_META[0];
+            const streetUrl = `/rue/${encodeURIComponent(r.nom_voie)}?city=${r.city_id}`;
             return (
-              <li key={r.id}>
+              <li key={`${r.nom_voie}-${r.city_id}`}>
                 <Link
-                  href={`/rue/${r.id}`}
+                  href={streetUrl}
                   className="flex items-center justify-between px-4 py-3 hover:bg-gray-50 transition-colors group"
                 >
                   <div className="min-w-0">
                     <p className="text-sm font-semibold text-gray-900 truncate group-hover:text-brand-primary">
-                      {r.nom_voie}
-                      {r.debut_adresse ? ` (${r.debut_adresse}–${r.fin_adresse})` : ''}
+                      {r.type_voie ? `${r.type_voie} ` : ''}{r.nom_voie}
                     </p>
                     <p className="text-xs text-gray-400 mt-0.5">
-                      {r.city_name ?? r.city_id}
-                      {r.arrondissement ? ` · ${r.arrondissement}` : ''}
+                      {r.city_name} &middot; {r.segment_count} segment{r.segment_count > 1 ? 's' : ''}
                     </p>
                   </div>
                   <span
@@ -100,7 +99,7 @@ export function SearchSection() {
       )}
 
       {searched && results.length === 0 && !loading && !error && (
-        <p className="text-center text-sm text-gray-400">Aucun résultat pour « {query} ».</p>
+        <p className="text-center text-sm text-gray-400">Aucun r&eacute;sultat pour &laquo; {query} &raquo;.</p>
       )}
     </div>
   );

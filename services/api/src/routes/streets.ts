@@ -63,7 +63,160 @@ const MapQuerySchema = z.object({
   limit: z.coerce.number().int().min(1).max(5000).default(2000),
 });
 
+const ByNameQuerySchema = z.object({
+  name: z.string().min(1).max(100),
+  cityId: z.string().min(1).max(20),
+});
+
 export async function streetsRoutes(app: FastifyInstance) {
+  // GET /api/streets/search-grouped?q=&cityId=&limit=
+  // Returns one result per unique street name + city (Google Maps style)
+  app.get('/search-grouped', async (req, reply) => {
+    const parsed = SearchQuerySchema.safeParse(req.query);
+    if (!parsed.success) {
+      return reply.code(400).send({ error: 'Invalid query', details: parsed.error.flatten() });
+    }
+
+    const { q, cityId, limit } = parsed.data;
+    const db = getDb();
+    const filterCity = cityId && cityId !== 'all';
+    const ftsAvailable = !!(db.prepare('SELECT rowid FROM street_segments_fts LIMIT 1').get());
+
+    const numMatch = q.match(/^(\d+)\s+(.*)/);
+    const searchTerm = numMatch ? numMatch[2] : q;
+
+    const worstEtatExpr = `COALESCE(
+      MAX(CASE WHEN COALESCE(os.etat, 0) = 3 THEN 3 END),
+      MAX(CASE WHEN COALESCE(os.etat, 0) = 5 THEN 5 END),
+      MAX(CASE WHEN COALESCE(os.etat, 0) = 2 THEN 2 END),
+      MAX(CASE WHEN COALESCE(os.etat, 0) = 4 THEN 4 END),
+      MAX(CASE WHEN COALESCE(os.etat, 0) = 1 THEN 1 END),
+      0
+    )`;
+
+    let rows;
+    if (ftsAvailable) {
+      const ftsQuery = `"${searchTerm.replace(/"/g, '""')}"*`;
+      rows = db.prepare(`
+        SELECT s.nom_voie, s.city_id,
+               COUNT(*) as segment_count,
+               ${worstEtatExpr} as worst_etat,
+               AVG(s.lat) as lat, AVG(s.lng) as lng,
+               MIN(s.debut_adresse) as min_adresse,
+               MAX(s.fin_adresse) as max_adresse,
+               MAX(s.type_voie) as type_voie
+        FROM street_segments s
+        INNER JOIN street_segments_fts fts ON fts.rowid = s.rowid
+        LEFT JOIN operation_statuses os ON os.segment_id = s.id
+        WHERE fts.nom_voie MATCH @ftsQuery
+          ${filterCity ? 'AND s.city_id = @cityId' : ''}
+        GROUP BY s.nom_voie, s.city_id
+        ORDER BY MIN(rank)
+        LIMIT @limit
+      `).all({ ftsQuery, ...(filterCity ? { cityId } : {}), limit });
+    } else {
+      rows = db.prepare(`
+        SELECT s.nom_voie, s.city_id,
+               COUNT(*) as segment_count,
+               ${worstEtatExpr} as worst_etat,
+               AVG(s.lat) as lat, AVG(s.lng) as lng,
+               MIN(s.debut_adresse) as min_adresse,
+               MAX(s.fin_adresse) as max_adresse,
+               MAX(s.type_voie) as type_voie
+        FROM street_segments s
+        LEFT JOIN operation_statuses os ON os.segment_id = s.id
+        WHERE ${filterCity ? 's.city_id = @cityId AND' : ''}
+          s.nom_voie LIKE @pattern COLLATE NOCASE
+        GROUP BY s.nom_voie, s.city_id
+        ORDER BY s.nom_voie
+        LIMIT @limit
+      `).all({ ...(filterCity ? { cityId } : {}), pattern: `%${searchTerm}%`, limit });
+    }
+
+    const results = (rows as Array<Record<string, unknown>>).map((row) => ({
+      nom_voie: row.nom_voie,
+      type_voie: row.type_voie,
+      city_id: row.city_id,
+      city_name: CITY_NAMES[row.city_id as string] ?? (row.city_id as string),
+      segment_count: row.segment_count,
+      worst_etat: row.worst_etat,
+      etat_label: etatLabel(row.worst_etat as number | null),
+      lat: row.lat,
+      lng: row.lng,
+    }));
+
+    return reply.send({ data: results, total: results.length });
+  });
+
+  // GET /api/streets/by-name?name=Saint-Denis&cityId=montreal
+  // Returns all segments for a street with geometry (for map display)
+  app.get('/by-name', async (req, reply) => {
+    const parsed = ByNameQuerySchema.safeParse(req.query);
+    if (!parsed.success) {
+      return reply.code(400).send({ error: 'Invalid query', details: parsed.error.flatten() });
+    }
+
+    const { name, cityId } = parsed.data;
+    const db = getDb();
+
+    const rows = db.prepare(`
+      SELECT s.id, s.nom_voie, s.type_voie, s.city_id, s.debut_adresse, s.fin_adresse,
+             s.cote, s.arrondissement, s.lat, s.lng, s.geometry,
+             os.etat, os.date_deb_planif, os.date_fin_planif, os.updated_at
+      FROM street_segments s
+      LEFT JOIN operation_statuses os ON os.segment_id = s.id
+      WHERE s.nom_voie = @name COLLATE NOCASE AND s.city_id = @cityId
+      ORDER BY s.debut_adresse
+    `).all({ name, cityId }) as Array<Record<string, unknown>>;
+
+    if (rows.length === 0) {
+      return reply.code(404).send({ error: 'Street not found' });
+    }
+
+    const segments = rows.map((row) => ({
+      id: row.id,
+      nom_voie: row.nom_voie,
+      type_voie: row.type_voie,
+      cote: row.cote,
+      debut_adresse: row.debut_adresse,
+      fin_adresse: row.fin_adresse,
+      lat: row.lat,
+      lng: row.lng,
+      geometry: row.geometry ? JSON.parse(row.geometry as string) : null,
+      etat: (row.etat as number) ?? 0,
+      etat_label: etatLabel(row.etat as number | null),
+      date_deb_planif: row.date_deb_planif,
+      date_fin_planif: row.date_fin_planif,
+      updated_at: row.updated_at,
+      ...computeTowing(row.etat as number | null, row.date_deb_planif as string | null),
+    }));
+
+    const validSegs = segments.filter((s) => s.lat && s.lng);
+    const center = validSegs.length > 0
+      ? {
+          lat: validSegs.reduce((sum, s) => sum + (s.lat as number), 0) / validSegs.length,
+          lng: validSegs.reduce((sum, s) => sum + (s.lng as number), 0) / validSegs.length,
+        }
+      : { lat: 45.5017, lng: -73.5673 };
+
+    const etats = segments.map((s) => s.etat);
+    const worstEtat = [3, 5, 2, 4, 1, 0].find((e) => etats.includes(e)) ?? 0;
+
+    return reply.send({
+      data: {
+        nom_voie: rows[0].nom_voie as string,
+        type_voie: rows[0].type_voie as string | null,
+        city_id: cityId,
+        city_name: CITY_NAMES[cityId] ?? cityId,
+        worst_etat: worstEtat,
+        etat_label: etatLabel(worstEtat),
+        segment_count: segments.length,
+        center,
+        segments,
+      },
+    });
+  });
+
   // GET /api/streets/search?q=&cityId=&limit=
   app.get('/search', async (req, reply) => {
     const parsed = SearchQuerySchema.safeParse(req.query);

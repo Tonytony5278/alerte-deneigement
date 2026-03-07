@@ -33,8 +33,8 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
               <span>Alerte Neige</span>
             </a>
             <nav className="flex items-center gap-4 text-sm font-medium text-gray-600">
-              <a href="/#chercher" className="hover:text-brand-primary transition-colors">Vérifier une rue</a>
-              <a href="/#villes" className="hover:text-brand-primary transition-colors">Villes</a>
+              <a href="/#chercher" className="hover:text-brand-primary transition-colors">Chercher</a>
+              <a href="/carte" className="hover:text-brand-primary transition-colors">Carte</a>
               <a
                 href="https://apps.apple.com"
                 target="_blank"
