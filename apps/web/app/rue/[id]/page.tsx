@@ -74,7 +74,9 @@ function StreetOverview({ street }: { street: Awaited<ReturnType<typeof getStree
   const dataAgeMinutes = latestUpdate
     ? (Date.now() - new Date(latestUpdate).getTime()) / 60_000
     : null;
-  const isStale = dataAgeMinutes !== null && dataAgeMinutes > 30;
+  // Only show stale warning when active operations exist (not during calm/normal periods)
+  const hasActiveOps = (street.worst_etat ?? 0) >= 2;
+  const isStale = hasActiveOps && dataAgeMinutes !== null && dataAgeMinutes > 30;
 
   // Find earliest planned start and latest planned end across all segments
   let earliestPlanif: string | null = null;
@@ -228,7 +230,8 @@ function SegmentDetail({ segment }: { segment: Awaited<ReturnType<typeof getStre
   const dataAgeMinutes = segment.updated_at
     ? (Date.now() - new Date(segment.updated_at).getTime()) / 60_000
     : null;
-  const isStale = dataAgeMinutes !== null && dataAgeMinutes > 30;
+  const hasActiveOps = (segment.etat ?? 0) >= 2;
+  const isStale = hasActiveOps && dataAgeMinutes !== null && dataAgeMinutes > 30;
 
   function formatDate(iso: string | null): string {
     if (!iso) return '\u2014';
