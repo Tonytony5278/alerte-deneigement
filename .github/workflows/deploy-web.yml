@@ -29,28 +29,16 @@ jobs:
 
       - name: Create deployment package
         run: |
-          echo "=== Standalone directory structure ==="
-          find apps/web/.next/standalone -maxdepth 4 -type d | head -40
-          echo "=== Top-level files ==="
-          find apps/web/.next/standalone -maxdepth 1 -type f
-          echo "=== Nested app files ==="
-          find apps/web/.next/standalone -maxdepth 5 -name "*.js" | head -20
-
           mkdir -p /tmp/deploy
-          # Copy entire standalone output
-          cp -r apps/web/.next/standalone/* /tmp/deploy/
-          # Copy static assets into correct location
-          # Find where .next dir lives in standalone output
-          NEXT_DIR=$(find /tmp/deploy -type d -name ".next" | head -1)
-          if [ -n "$NEXT_DIR" ]; then
-            echo "Found .next at: $NEXT_DIR"
-            cp -r apps/web/.next/static "$NEXT_DIR/static"
-          else
-            echo "No .next found, creating at root"
-            mkdir -p /tmp/deploy/.next
-            cp -r apps/web/.next/static /tmp/deploy/.next/static
-          fi
+          # Standalone output: server.js + .next/server/ at apps/web/.next/standalone/
+          cp -r apps/web/.next/standalone/. /tmp/deploy/
+          # Static assets are not included in standalone — copy them in
+          cp -r apps/web/.next/static /tmp/deploy/.next/static
           cp -r apps/web/public /tmp/deploy/public 2>/dev/null || true
+          # Verify key files
+          echo "server.js: $(test -f /tmp/deploy/server.js && echo OK || echo MISSING)"
+          echo ".next/server: $(test -d /tmp/deploy/.next/server && echo OK || echo MISSING)"
+          echo ".next/static: $(test -d /tmp/deploy/.next/static && echo OK || echo MISSING)"
           cd /tmp/deploy
           zip -r $GITHUB_WORKSPACE/deploy.zip .
 
