@@ -70,9 +70,24 @@ async function bootstrap() {
         SELECT
           (SELECT COUNT(*) FROM street_segments) AS segments,
           (SELECT COUNT(*) FROM operation_statuses) AS statuses,
-          (SELECT COUNT(*) FROM user_watches) AS watches
+          (SELECT COUNT(*) FROM user_watches) AS watches,
+          (SELECT COUNT(*) FROM street_segments_fts) AS fts_rows
       `)
-      .get() as { segments: number; statuses: number; watches: number };
+      .get() as { segments: number; statuses: number; watches: number; fts_rows: number };
+
+    // Quick FTS benchmark
+    const t0 = performance.now();
+    db.prepare(`SELECT s.id FROM street_segments s
+      INNER JOIN street_segments_fts fts ON fts.rowid = s.rowid
+      LEFT JOIN operation_statuses os ON os.segment_id = s.id
+      WHERE fts.nom_voie MATCH '"fullum"*' LIMIT 5`).all();
+    const ftsMs = Math.round(performance.now() - t0);
+
+    const t1 = performance.now();
+    db.prepare(`SELECT s.id FROM street_segments s
+      LEFT JOIN operation_statuses os ON os.segment_id = s.id
+      WHERE s.nom_voie LIKE '%fullum%' COLLATE NOCASE LIMIT 5`).all();
+    const likeMs = Math.round(performance.now() - t1);
 
     const latest = db
       .prepare('SELECT MAX(updated_at) AS latest FROM operation_statuses')
@@ -82,6 +97,7 @@ async function bootstrap() {
       ...counts,
       latestStatusUpdate: latest.latest,
       poller: getPollerStatus(),
+      searchBenchmark: { ftsMs, likeMs },
     };
   });
 

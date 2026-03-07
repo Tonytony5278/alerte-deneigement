@@ -76,7 +76,8 @@ export async function streetsRoutes(app: FastifyInstance) {
     const filterCity = cityId && cityId !== 'all';
 
     // Check if FTS table has data
-    const ftsAvailable = (db.prepare('SELECT COUNT(*) as c FROM street_segments_fts').get() as { c: number }).c > 0;
+    const ftsCount = (db.prepare('SELECT COUNT(*) as c FROM street_segments_fts').get() as { c: number }).c;
+    const ftsAvailable = ftsCount > 0;
 
     const numMatch = q.match(/^(\d+)\s+(.*)/);
     let rows;
