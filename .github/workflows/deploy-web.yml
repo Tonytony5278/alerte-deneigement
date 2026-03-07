@@ -71,6 +71,7 @@ jobs:
             --resource-group alerte-neige-rg \
             --src-path deploy.zip \
             --type zip \
+            --clean true \
             --timeout 300
 
       - name: Health check
