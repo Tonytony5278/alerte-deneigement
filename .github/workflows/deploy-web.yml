@@ -30,15 +30,23 @@ jobs:
       - name: Create deployment package
         run: |
           mkdir -p /tmp/deploy
-          # Standalone output: server.js + .next/server/ at apps/web/.next/standalone/
+          # Copy standalone output (server.js + .next/server/)
           cp -r apps/web/.next/standalone/. /tmp/deploy/
           # Static assets are not included in standalone — copy them in
           cp -r apps/web/.next/static /tmp/deploy/.next/static
           cp -r apps/web/public /tmp/deploy/public 2>/dev/null || true
+          # In monorepo, node_modules are hoisted — standalone doesn't include them
+          # Install production deps for next standalone server
+          if [ ! -d /tmp/deploy/node_modules ]; then
+            cd /tmp/deploy
+            npm install --omit=dev
+            cd $GITHUB_WORKSPACE
+          fi
           # Verify key files
           echo "server.js: $(test -f /tmp/deploy/server.js && echo OK || echo MISSING)"
           echo ".next/server: $(test -d /tmp/deploy/.next/server && echo OK || echo MISSING)"
           echo ".next/static: $(test -d /tmp/deploy/.next/static && echo OK || echo MISSING)"
+          echo "node_modules/next: $(test -d /tmp/deploy/node_modules/next && echo OK || echo MISSING)"
           cd /tmp/deploy
           zip -r $GITHUB_WORKSPACE/deploy.zip .
 
