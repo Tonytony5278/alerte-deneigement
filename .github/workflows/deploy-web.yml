@@ -29,18 +29,28 @@ jobs:
 
       - name: Create deployment package
         run: |
+          echo "=== Standalone directory structure ==="
+          find apps/web/.next/standalone -maxdepth 4 -type d | head -40
+          echo "=== Top-level files ==="
+          find apps/web/.next/standalone -maxdepth 1 -type f
+          echo "=== Nested app files ==="
+          find apps/web/.next/standalone -maxdepth 5 -name "*.js" | head -20
+
           mkdir -p /tmp/deploy
-          # Copy entire standalone output (preserves monorepo structure with node_modules + server bundles)
+          # Copy entire standalone output
           cp -r apps/web/.next/standalone/* /tmp/deploy/
-          # Copy static assets (not included in standalone output)
-          cp -r apps/web/.next/static /tmp/deploy/apps/web/.next/static
-          cp -r apps/web/public /tmp/deploy/apps/web/public 2>/dev/null || true
-          # Debug: show key files exist
-          echo "=== Key files ==="
-          ls -la /tmp/deploy/server.js /tmp/deploy/node_modules 2>/dev/null || true
-          ls -la /tmp/deploy/apps/web/.next/server 2>/dev/null || echo "WARN: no apps/web/.next/server"
-          ls -la /tmp/deploy/apps/web/node_modules 2>/dev/null || echo "WARN: no apps/web/node_modules"
-          find /tmp/deploy -maxdepth 4 -name "*.js" | head -20
+          # Copy static assets into correct location
+          # Find where .next dir lives in standalone output
+          NEXT_DIR=$(find /tmp/deploy -type d -name ".next" | head -1)
+          if [ -n "$NEXT_DIR" ]; then
+            echo "Found .next at: $NEXT_DIR"
+            cp -r apps/web/.next/static "$NEXT_DIR/static"
+          else
+            echo "No .next found, creating at root"
+            mkdir -p /tmp/deploy/.next
+            cp -r apps/web/.next/static /tmp/deploy/.next/static
+          fi
+          cp -r apps/web/public /tmp/deploy/public 2>/dev/null || true
           cd /tmp/deploy
           zip -r $GITHUB_WORKSPACE/deploy.zip .
 
