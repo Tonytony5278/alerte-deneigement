@@ -119,7 +119,7 @@ function StreetOverview({ street }: { street: Awaited<ReturnType<typeof getStree
             {street.type_voie ? `${street.type_voie} ` : ''}{street.nom_voie}
           </h1>
           <p className="text-gray-500 text-sm">
-            {street.city_name} &middot; {street.segment_count} segments
+            {street.city_name}
             {updatedLabel && <> &middot; mis &agrave; jour {updatedLabel}</>}
           </p>
         </div>
@@ -149,12 +149,25 @@ function StreetOverview({ street }: { street: Awaited<ReturnType<typeof getStree
         </div>
       )}
 
+      {/* Towing warning */}
+      {street.segments.some(s => s.towing_status === 'active') && (
+        <div className="bg-red-50 border-2 border-red-300 rounded-2xl px-5 py-4 mb-6 text-center">
+          <p className="text-red-700 font-bold text-base">Remorquage en vigueur</p>
+          <p className="text-red-600 text-sm mt-1">D&eacute;place ton auto imm&eacute;diatement pour &eacute;viter une contravention.</p>
+        </div>
+      )}
+      {!street.segments.some(s => s.towing_status === 'active') && street.segments.some(s => s.towing_status === 'imminent') && (
+        <div className="bg-amber-50 border-2 border-amber-300 rounded-2xl px-5 py-4 mb-6 text-center">
+          <p className="text-amber-700 font-bold text-base">Remorquage imminent</p>
+          <p className="text-amber-600 text-sm mt-1">Les panneaux sont install&eacute;s. D&eacute;place ton auto bient&ocirc;t.</p>
+        </div>
+      )}
+
       {/* Status breakdown */}
-      {Object.keys(statusCounts).length <= 1 ? (
-        <div className="bg-white border border-gray-100 rounded-2xl shadow-sm px-5 py-4 mb-8">
-          <p className="text-sm text-gray-600">
-            {street.segment_count} segments &mdash; tous <strong style={{ color: meta.color }}>{meta.label.toLowerCase()}</strong>
-          </p>
+      {Object.keys(statusCounts).length <= 1 && (street.worst_etat ?? 0) <= 1 ? (
+        <div className="bg-green-50 border border-green-100 rounded-2xl shadow-sm px-5 py-4 mb-8 text-center">
+          <p className="text-green-800 font-semibold">Aucun d&eacute;neigement pr&eacute;vu</p>
+          <p className="text-green-600 text-sm mt-1">Tout est normal sur cette rue.</p>
         </div>
       ) : (
         <>

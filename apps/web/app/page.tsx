@@ -1,3 +1,4 @@
+import Link from 'next/link';
 import { getCities, type CityConfig } from '@/lib/api';
 import { SearchSection } from './SearchSection';
 
@@ -89,19 +90,25 @@ export default async function HomePage() {
         <section id="villes" className="max-w-2xl mx-auto px-4 py-12">
           <h2 className="text-2xl font-bold text-center mb-8">Villes couvertes</h2>
           <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
-            {cities.map((city) => (
-              <div
-                key={city.id}
-                className={`rounded-xl px-4 py-3 border text-sm font-semibold text-center ${
-                  city.available
-                    ? 'bg-blue-50 border-blue-200 text-blue-800'
-                    : 'bg-gray-50 border-gray-200 text-gray-400'
-                }`}
-              >
-                {city.name}
-                {!city.available && <span className="block text-xs font-normal mt-0.5">Bientôt</span>}
-              </div>
-            ))}
+            {cities.map((city) =>
+              city.available ? (
+                <Link
+                  key={city.id}
+                  href={`/carte?city=${city.id}`}
+                  className="rounded-xl px-4 py-3 border text-sm font-semibold text-center bg-blue-50 border-blue-200 text-blue-800 hover:bg-blue-100 hover:border-blue-300 transition-colors"
+                >
+                  {city.name}
+                </Link>
+              ) : (
+                <div
+                  key={city.id}
+                  className="rounded-xl px-4 py-3 border text-sm font-semibold text-center bg-gray-50 border-gray-200 text-gray-400"
+                >
+                  {city.name}
+                  <span className="block text-xs font-normal mt-0.5">Bient&ocirc;t</span>
+                </div>
+              )
+            )}
           </div>
         </section>
       )}

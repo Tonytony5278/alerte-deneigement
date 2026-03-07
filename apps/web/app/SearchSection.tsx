@@ -76,7 +76,7 @@ export function SearchSection() {
                       {r.type_voie ? `${r.type_voie} ` : ''}{r.nom_voie}
                     </p>
                     <p className="text-xs text-gray-400 mt-0.5">
-                      {r.city_name} &middot; {r.segment_count} segment{r.segment_count > 1 ? 's' : ''}
+                      {r.city_name}
                     </p>
                   </div>
                   <span
