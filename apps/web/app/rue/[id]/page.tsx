@@ -5,6 +5,7 @@ import { getStreet, getStreetByName, STATUS_META } from '@/lib/api';
 import dynamic from 'next/dynamic';
 
 const StreetMap = dynamic(() => import('@/app/components/StreetMap'), { ssr: false });
+const ShareButton = dynamic(() => import('@/app/components/ShareButton'), { ssr: false });
 
 interface Props {
   params: Promise<{ id: string }>;
@@ -162,13 +163,18 @@ function StreetOverview({ street }: { street: Awaited<ReturnType<typeof getStree
         </>
       )}
 
-      <div className="mb-8">
+      <div className="flex items-center gap-6 mb-8">
         <Link
           href={`/carte?street=${encodeURIComponent(street.nom_voie)}&city=${street.city_id}`}
           className="inline-flex items-center gap-2 text-sm font-medium text-brand-primary hover:underline"
         >
           Voir sur la carte interactive &rarr;
         </Link>
+        <ShareButton
+          title={`${street.type_voie ? street.type_voie + ' ' : ''}${street.nom_voie} - Alerte Neige`}
+          text={`Statut de déneigement pour ${street.nom_voie} à ${street.city_name}`}
+          url={`https://alerteneige.app/rue/${encodeURIComponent(street.nom_voie)}?city=${street.city_id}`}
+        />
       </div>
 
       <DownloadCTA />

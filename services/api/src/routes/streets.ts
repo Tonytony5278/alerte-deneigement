@@ -451,4 +451,19 @@ export async function streetsRoutes(app: FastifyInstance) {
       data: { ...status, etat_label: etatLabel(status.etat as number | null) },
     });
   });
+
+  // ── Sitemap: all unique street names grouped by city ─────────────
+  app.get('/sitemap-urls', async (_request, reply) => {
+    const db = getDb();
+
+    const rows = db.prepare(`
+      SELECT nom_voie, city_id
+      FROM street_segments
+      WHERE nom_voie IS NOT NULL AND nom_voie != ''
+      GROUP BY nom_voie, city_id
+      ORDER BY city_id, nom_voie
+    `).all() as { nom_voie: string; city_id: string }[];
+
+    return reply.send({ data: rows });
+  });
 }
