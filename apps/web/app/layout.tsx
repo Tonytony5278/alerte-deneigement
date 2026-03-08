@@ -49,7 +49,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
                 href="https://apps.apple.com"
                 target="_blank"
                 rel="noopener noreferrer"
-                className="bg-brand-primary text-white px-3 py-1.5 rounded-full text-xs hover:bg-blue-700 transition-colors"
+                className="hide-in-pwa bg-brand-primary text-white px-3 py-1.5 rounded-full text-xs hover:bg-blue-700 transition-colors"
               >
                 Télécharger
               </a>
@@ -57,7 +57,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
           </div>
         </header>
         <main>{children}</main>
-        <footer className="mt-16 border-t border-gray-100 py-8 text-center text-sm text-gray-400">
+        <footer className="hide-in-pwa mt-16 border-t border-gray-100 py-8 text-center text-sm text-gray-400">
           <p>&copy; {new Date().getFullYear()} Alerte Neige &middot; <a href="mailto:info@alerteneige.app" className="hover:underline">info@alerteneige.app</a> &middot; <a href="/politique" className="hover:underline">Confidentialit&eacute;</a></p>
           <p className="mt-1">Donn&eacute;es : Ville de Montr&eacute;al, Longueuil, Laval, Qu&eacute;bec et Gatineau &middot; OpenStreetMap</p>
           <p className="mt-1">La signalisation sur rue prime toujours &mdash; cet outil est fourni &agrave; titre informatif.</p>

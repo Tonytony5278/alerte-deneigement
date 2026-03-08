@@ -25,8 +25,38 @@ export default async function HomePage() {
 
   return (
     <>
+      {/* ── PWA app-like experience (standalone mode only) ── */}
+      <div className="show-in-pwa">
+        <section className="max-w-2xl mx-auto px-4 pt-6 pb-4">
+          <h1 className="text-xl font-bold text-gray-900 mb-1">Chercher une rue</h1>
+          <p className="text-gray-500 text-sm mb-4">V&eacute;rifie si le d&eacute;neigement est planifi&eacute; sur ta rue.</p>
+          <SearchSection />
+          <div className="mt-6 flex gap-2">
+            <Link
+              href="/carte"
+              className="flex-1 text-center bg-brand-primary text-white px-4 py-3 rounded-xl font-semibold text-sm hover:bg-blue-700 transition-colors"
+            >
+              Voir la carte
+            </Link>
+          </div>
+          <div className="mt-4 flex flex-wrap gap-2 justify-center">
+            {cities.filter((c) => c.available).map((city) => (
+              <Link
+                key={city.id}
+                href={`/carte?city=${city.id}`}
+                className="px-3 py-1.5 rounded-full text-xs font-semibold bg-blue-50 text-blue-800 hover:bg-blue-100 transition-colors"
+              >
+                {city.nameShort}
+              </Link>
+            ))}
+          </div>
+        </section>
+      </div>
+
+      {/* ── Website marketing experience (browser only) ── */}
+
       {/* Hero */}
-      <section className="bg-gradient-to-b from-blue-50 to-white pt-16 pb-12 px-4 text-center">
+      <section className="hide-in-pwa bg-gradient-to-b from-blue-50 to-white pt-16 pb-12 px-4 text-center">
         <div className="max-w-2xl mx-auto">
           <Logo size={72} className="mx-auto mb-6" />
           <h1 className="text-4xl md:text-5xl font-extrabold text-gray-900 leading-tight mb-4">
@@ -63,15 +93,15 @@ export default async function HomePage() {
         </div>
       </section>
 
-      {/* Street search */}
-      <section id="chercher" className="max-w-2xl mx-auto px-4 py-12">
-        <h2 className="text-2xl font-bold text-center mb-2">Vérifier le statut d'une rue</h2>
+      {/* Street search (browser only — PWA has its own above) */}
+      <section id="chercher" className="hide-in-pwa max-w-2xl mx-auto px-4 py-12">
+        <h2 className="text-2xl font-bold text-center mb-2">Vérifier le statut d&apos;une rue</h2>
         <p className="text-gray-500 text-center text-sm mb-8">Cherche une adresse pour voir si le déneigement est planifié.</p>
         <SearchSection />
       </section>
 
-      {/* Features */}
-      <section className="bg-gray-50 py-12 px-4">
+      {/* Features (browser only) */}
+      <section className="hide-in-pwa bg-gray-50 py-12 px-4">
         <div className="max-w-4xl mx-auto">
           <h2 className="text-2xl font-bold text-center mb-10">Pourquoi Alerte Neige ?</h2>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
@@ -86,9 +116,9 @@ export default async function HomePage() {
         </div>
       </section>
 
-      {/* Cities */}
+      {/* Cities (browser only) */}
       {cities.length > 0 && (
-        <section id="villes" className="max-w-2xl mx-auto px-4 py-12">
+        <section id="villes" className="hide-in-pwa max-w-2xl mx-auto px-4 py-12">
           <h2 className="text-2xl font-bold text-center mb-8">Villes couvertes</h2>
           <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
             {cities.map((city) =>
@@ -114,8 +144,8 @@ export default async function HomePage() {
         </section>
       )}
 
-      {/* CTA bottom */}
-      <section className="bg-brand-primary text-white py-12 px-4 text-center">
+      {/* CTA bottom (browser only) */}
+      <section className="hide-in-pwa bg-brand-primary text-white py-12 px-4 text-center">
         <h2 className="text-2xl font-bold mb-3">Protège ton auto ce soir</h2>
         <p className="text-blue-100 mb-6 text-sm">Télécharge l&apos;app et configure ta première alerte en 2 minutes.</p>
         <div className="flex flex-col sm:flex-row gap-3 justify-center">
