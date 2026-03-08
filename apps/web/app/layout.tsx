@@ -1,6 +1,6 @@
 import type { Metadata } from 'next';
-import Image from 'next/image';
 import { Analytics } from './components/Analytics';
+import { Logo } from './components/Logo';
 import './globals.css';
 
 export const metadata: Metadata = {
@@ -36,8 +36,8 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         <Analytics />
         <header className="sticky top-0 z-50 bg-white border-b border-gray-100 shadow-sm">
           <div className="max-w-4xl mx-auto px-4 h-14 flex items-center justify-between">
-            <a href="/" className="flex items-center gap-2 font-bold text-lg text-brand-primary">
-              <Image src="/logo.png" alt="Alerte Neige" width={32} height={32} className="rounded-lg" />
+            <a href="/" className="flex items-center gap-1.5 font-bold text-lg text-brand-primary">
+              <Logo size={28} />
               <span>Alerte Neige</span>
             </a>
             <nav className="flex items-center gap-4 text-sm font-medium text-gray-600">

@@ -1,6 +1,6 @@
 import Link from 'next/link';
-import Image from 'next/image';
 import { getCities, type CityConfig } from '@/lib/api';
+import { Logo } from './components/Logo';
 import { SearchSection } from './SearchSection';
 
 const FEATURES = [
@@ -28,7 +28,7 @@ export default async function HomePage() {
       {/* Hero */}
       <section className="bg-gradient-to-b from-blue-50 to-white pt-16 pb-12 px-4 text-center">
         <div className="max-w-2xl mx-auto">
-          <Image src="/logo.png" alt="Alerte Neige" width={96} height={96} className="mx-auto mb-6 rounded-2xl" priority />
+          <Logo size={72} className="mx-auto mb-6" />
           <h1 className="text-4xl md:text-5xl font-extrabold text-gray-900 leading-tight mb-4">
             Fini les contraventions<br className="hidden sm:block" /> de déneigement
           </h1>

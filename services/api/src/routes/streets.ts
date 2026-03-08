@@ -103,8 +103,14 @@ export async function streetsRoutes(app: FastifyInstance) {
       0
     )`;
 
-    // Exclude placeholder segment names (e.g. "Segment Longueuil #14479")
-    const excludePlaceholder = "AND s.nom_voie NOT LIKE 'Segment %'";
+    // Exclude all placeholder/generic segment names from search results
+    const excludePlaceholder = `
+      AND s.nom_voie NOT LIKE 'Segment %'
+      AND s.nom_voie NOT LIKE 'Zone %'
+      AND s.nom_voie NOT LIKE 'Rue Gatineau #%'
+      AND s.nom_voie NOT LIKE 'Rue Laval #%'
+      AND s.nom_voie NOT GLOB '[0-9]*'
+    `;
 
     let rows;
     if (ftsAvailable) {
@@ -284,7 +290,13 @@ export async function streetsRoutes(app: FastifyInstance) {
     // Strip street type prefix from query
     const cleanQ = q.replace(STREET_TYPE_PREFIXES, '').trim() || q;
     const numMatch = cleanQ.match(/^(\d+)\s+(.*)/);
-    const noPlaceholder = "AND s.nom_voie NOT LIKE 'Segment %'";
+    const noPlaceholder = `
+      AND s.nom_voie NOT LIKE 'Segment %'
+      AND s.nom_voie NOT LIKE 'Zone %'
+      AND s.nom_voie NOT LIKE 'Rue Gatineau #%'
+      AND s.nom_voie NOT LIKE 'Rue Laval #%'
+      AND s.nom_voie NOT GLOB '[0-9]*'
+    `;
     let rows;
 
     if (numMatch) {
@@ -516,7 +528,12 @@ export async function streetsRoutes(app: FastifyInstance) {
     const rows = db.prepare(`
       SELECT nom_voie, city_id
       FROM street_segments
-      WHERE nom_voie IS NOT NULL AND nom_voie != '' AND nom_voie NOT LIKE 'Segment %'
+      WHERE nom_voie IS NOT NULL AND nom_voie != ''
+        AND nom_voie NOT LIKE 'Segment %'
+        AND nom_voie NOT LIKE 'Zone %'
+        AND nom_voie NOT LIKE 'Rue Gatineau #%'
+        AND nom_voie NOT LIKE 'Rue Laval #%'
+        AND nom_voie NOT GLOB '[0-9]*'
       GROUP BY nom_voie, city_id
       ORDER BY city_id, nom_voie
     `).all() as { nom_voie: string; city_id: string }[];
