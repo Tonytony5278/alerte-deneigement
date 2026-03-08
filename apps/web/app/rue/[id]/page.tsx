@@ -9,19 +9,20 @@ const ShareButton = dynamic(() => import('@/app/components/ShareButton'), { ssr:
 
 interface Props {
   params: Promise<{ id: string }>;
-  searchParams: Promise<{ city?: string }>;
+  searchParams: Promise<{ city?: string; address?: string }>;
 }
 
 export async function generateMetadata({ params, searchParams }: Props): Promise<Metadata> {
   const { id } = await params;
-  const { city } = await searchParams;
+  const { city, address } = await searchParams;
 
   if (city) {
     const street = await getStreetByName(decodeURIComponent(id), city);
     if (!street) return { title: 'Rue introuvable' };
+    const prefix = address ? `${address} ` : '';
     return {
-      title: `${street.type_voie ? street.type_voie + ' ' : ''}${street.nom_voie} - Alerte Neige`,
-      description: `Statut de d\u00e9neigement pour ${street.nom_voie} \u00e0 ${street.city_name}`,
+      title: `${prefix}${street.type_voie ? street.type_voie + ' ' : ''}${street.nom_voie} - Alerte Neige`,
+      description: `Statut de d\u00e9neigement pour ${prefix}${street.nom_voie} \u00e0 ${street.city_name}`,
     };
   }
 
@@ -35,13 +36,14 @@ export async function generateMetadata({ params, searchParams }: Props): Promise
 
 export default async function StreetDetailPage({ params, searchParams }: Props) {
   const { id } = await params;
-  const { city } = await searchParams;
+  const { city, address } = await searchParams;
+  const addressNum = address ? Number(address) : null;
 
   // Street name mode (from grouped search)
   if (city) {
     const street = await getStreetByName(decodeURIComponent(id), city);
     if (!street) return notFound();
-    return <StreetOverview street={street} />;
+    return <StreetOverview street={street} address={addressNum} />;
   }
 
   // Legacy segment ID mode
@@ -52,8 +54,15 @@ export default async function StreetDetailPage({ params, searchParams }: Props) 
 
 /* ─── Street overview (grouped, with map) ─────────────────────────── */
 
-function StreetOverview({ street }: { street: Awaited<ReturnType<typeof getStreetByName>> & {} }) {
+function StreetOverview({ street, address }: { street: Awaited<ReturnType<typeof getStreetByName>> & {}; address?: number | null }) {
   const meta = STATUS_META[street.worst_etat ?? 0] ?? STATUS_META[0];
+
+  // Find the segment matching the address number
+  const matchedSegment = address
+    ? street.segments.find(
+        (s) => s.debut_adresse && s.fin_adresse && s.debut_adresse <= address && s.fin_adresse >= address
+      )
+    : null;
 
   const statusCounts: Record<number, number> = {};
   let latestUpdate: string | null = null;
@@ -131,12 +140,30 @@ function StreetOverview({ street }: { street: Awaited<ReturnType<typeof getStree
         </span>
       </div>
 
+      {/* Address match banner */}
+      {matchedSegment && address && (
+        <div className="bg-blue-50 border border-blue-200 rounded-2xl px-5 py-4 mb-4">
+          <p className="text-blue-900 font-semibold text-sm">
+            {address} {street.type_voie ? `${street.type_voie} ` : ''}{street.nom_voie}
+            {matchedSegment.cote && <span className="text-blue-600 font-normal"> &middot; c&ocirc;t&eacute; {matchedSegment.cote.toLowerCase()}</span>}
+          </p>
+          <p className="text-blue-700 text-sm mt-1">
+            Statut : <strong style={{ color: (STATUS_META[matchedSegment.etat ?? 0] ?? STATUS_META[0]).color }}>
+              {(STATUS_META[matchedSegment.etat ?? 0] ?? STATUS_META[0]).label}
+            </strong>
+          </p>
+        </div>
+      )}
+
       {/* Map */}
       <div className="mb-6">
         <StreetMap
           segments={street.segments}
-          center={[street.center.lat, street.center.lng]}
-          zoom={14}
+          center={matchedSegment?.lat
+            ? [matchedSegment.lat, matchedSegment.lng]
+            : [street.center.lat, street.center.lng]
+          }
+          zoom={matchedSegment ? 16 : 14}
           height="450px"
         />
       </div>
@@ -195,13 +222,15 @@ function StreetOverview({ street }: { street: Awaited<ReturnType<typeof getStree
             <div className="divide-y divide-gray-50 max-h-96 overflow-y-auto">
               {street.segments.map((seg) => {
                 const segMeta = STATUS_META[seg.etat ?? 0] ?? STATUS_META[0];
+                const isMatch = matchedSegment?.id === seg.id;
                 return (
-                  <div key={seg.id} className="flex items-center justify-between px-4 py-2.5 text-sm">
+                  <div key={seg.id} className={`flex items-center justify-between px-4 py-2.5 text-sm ${isMatch ? 'bg-blue-50 border-l-4 border-l-blue-500' : ''}`}>
                     <div>
                       <span className="text-gray-700">
                         {seg.debut_adresse ? `${seg.debut_adresse}\u2013${seg.fin_adresse}` : seg.cote ?? '\u2014'}
                       </span>
                       {seg.debut_adresse && seg.cote && <span className="text-gray-400 ml-2">({seg.cote})</span>}
+                      {isMatch && <span className="text-blue-600 ml-2 text-xs font-medium">&larr; votre adresse</span>}
                     </div>
                     <span
                       className="text-xs font-semibold px-2 py-0.5 rounded-full"

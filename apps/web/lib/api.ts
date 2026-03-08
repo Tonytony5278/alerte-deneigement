@@ -30,6 +30,17 @@ export interface GroupedStreetResult {
   etat_label: string;
   lat: number;
   lng: number;
+  address?: number;
+  matched_segment?: {
+    id: string;
+    cote: string | null;
+    debut_adresse: number | null;
+    fin_adresse: number | null;
+    etat: number;
+    etat_label: string;
+    towing_status: string;
+    towing_label: string | null;
+  };
 }
 
 export interface StreetDetail {

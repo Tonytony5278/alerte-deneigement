@@ -82,8 +82,11 @@ export async function streetsRoutes(app: FastifyInstance) {
     const filterCity = cityId && cityId !== 'all';
     const ftsAvailable = !!(db.prepare('SELECT rowid FROM street_segments_fts LIMIT 1').get());
 
-    const numMatch = q.match(/^(\d+)\s+(.*)/);
-    const searchTerm = numMatch ? numMatch[2] : q;
+    // Parse address number from query: "4523 Saint-Denis" or "Saint-Denis 4523"
+    const leadingNum = q.match(/^(\d+)\s+(.*)/);
+    const trailingNum = q.match(/^(.*?)\s+(\d+)$/);
+    const addressNum = leadingNum ? Number(leadingNum[1]) : trailingNum ? Number(trailingNum[2]) : null;
+    const searchTerm = leadingNum ? leadingNum[2] : trailingNum ? trailingNum[1] : q;
 
     const worstEtatExpr = `COALESCE(
       MAX(CASE WHEN COALESCE(os.etat, 0) = 3 THEN 3 END),
@@ -133,17 +136,53 @@ export async function streetsRoutes(app: FastifyInstance) {
       `).all({ ...(filterCity ? { cityId } : {}), pattern: `%${searchTerm}%`, limit });
     }
 
-    const results = (rows as Array<Record<string, unknown>>).map((row) => ({
-      nom_voie: row.nom_voie,
-      type_voie: row.type_voie,
-      city_id: row.city_id,
-      city_name: CITY_NAMES[row.city_id as string] ?? (row.city_id as string),
-      segment_count: row.segment_count,
-      worst_etat: row.worst_etat,
-      etat_label: etatLabel(row.worst_etat as number | null),
-      lat: row.lat,
-      lng: row.lng,
-    }));
+    // If address number provided, find the matching segment for each result
+    const matchedSegments = new Map<string, Record<string, unknown>>();
+    if (addressNum) {
+      for (const row of rows as Array<Record<string, unknown>>) {
+        const seg = db.prepare(`
+          SELECT s.id, s.cote, s.debut_adresse, s.fin_adresse, s.lat, s.lng,
+                 COALESCE(os.etat, 0) as etat, os.date_deb_planif
+          FROM street_segments s
+          LEFT JOIN operation_statuses os ON os.segment_id = s.id
+          WHERE s.nom_voie = @name COLLATE NOCASE AND s.city_id = @cityId
+            AND s.debut_adresse <= @addr AND s.fin_adresse >= @addr
+          ORDER BY ABS(s.debut_adresse - @addr)
+          LIMIT 1
+        `).get({ name: row.nom_voie, cityId: row.city_id, addr: addressNum }) as Record<string, unknown> | undefined;
+        if (seg) {
+          matchedSegments.set(`${row.nom_voie}|${row.city_id}`, seg);
+        }
+      }
+    }
+
+    const results = (rows as Array<Record<string, unknown>>).map((row) => {
+      const key = `${row.nom_voie}|${row.city_id}`;
+      const matched = matchedSegments.get(key);
+      return {
+        nom_voie: row.nom_voie,
+        type_voie: row.type_voie,
+        city_id: row.city_id,
+        city_name: CITY_NAMES[row.city_id as string] ?? (row.city_id as string),
+        segment_count: row.segment_count,
+        worst_etat: matched ? matched.etat as number : row.worst_etat,
+        etat_label: matched ? etatLabel(matched.etat as number | null) : etatLabel(row.worst_etat as number | null),
+        lat: matched?.lat ? matched.lat as number : row.lat as number,
+        lng: matched?.lng ? matched.lng as number : row.lng as number,
+        ...(addressNum ? { address: addressNum } : {}),
+        ...(matched ? {
+          matched_segment: {
+            id: matched.id,
+            cote: matched.cote,
+            debut_adresse: matched.debut_adresse,
+            fin_adresse: matched.fin_adresse,
+            etat: matched.etat,
+            etat_label: etatLabel(matched.etat as number | null),
+            ...computeTowing(matched.etat as number | null, matched.date_deb_planif as string | null),
+          },
+        } : {}),
+      };
+    });
 
     return reply.send({ data: results, total: results.length });
   });

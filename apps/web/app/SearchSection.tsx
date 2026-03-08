@@ -64,7 +64,9 @@ export function SearchSection() {
         <ul className="divide-y divide-gray-100 border border-gray-100 rounded-xl overflow-hidden shadow-sm bg-white">
           {results.map((r) => {
             const meta = STATUS_META[r.worst_etat ?? 0] ?? STATUS_META[0];
-            const streetUrl = `/rue/${encodeURIComponent(r.nom_voie)}?city=${r.city_id}`;
+            const addressParam = r.address ? `&address=${r.address}` : '';
+            const streetUrl = `/rue/${encodeURIComponent(r.nom_voie)}?city=${r.city_id}${addressParam}`;
+            const hasMatch = r.matched_segment;
             return (
               <li key={`${r.nom_voie}-${r.city_id}`}>
                 <Link
@@ -73,10 +75,12 @@ export function SearchSection() {
                 >
                   <div className="min-w-0">
                     <p className="text-sm font-semibold text-gray-900 truncate group-hover:text-brand-primary">
+                      {r.address && <span className="text-gray-500 font-normal">{r.address} </span>}
                       {r.type_voie ? `${r.type_voie} ` : ''}{r.nom_voie}
                     </p>
                     <p className="text-xs text-gray-400 mt-0.5">
                       {r.city_name}
+                      {hasMatch?.cote && <> &middot; c&ocirc;t&eacute; {hasMatch.cote.toLowerCase()}</>}
                     </p>
                   </div>
                   <span
