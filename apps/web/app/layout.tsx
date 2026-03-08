@@ -1,4 +1,5 @@
 import type { Metadata } from 'next';
+import { Analytics } from './components/Analytics';
 import './globals.css';
 
 export const metadata: Metadata = {
@@ -30,6 +31,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
   return (
     <html lang="fr-CA">
       <body className="bg-white text-gray-900 antialiased">
+        <Analytics />
         <header className="sticky top-0 z-50 bg-white border-b border-gray-100 shadow-sm">
           <div className="max-w-4xl mx-auto px-4 h-14 flex items-center justify-between">
             <a href="/" className="flex items-center gap-2 font-bold text-lg text-brand-primary">

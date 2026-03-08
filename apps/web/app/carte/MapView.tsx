@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useCallback, useRef, useEffect } from 'react';
-import { MapContainer, TileLayer, Polyline, Popup, useMapEvents, useMap } from 'react-leaflet';
+import { MapContainer, TileLayer, Polyline, Popup, useMapEvents, useMap, CircleMarker } from 'react-leaflet';
 import { useSearchParams } from 'next/navigation';
 import 'leaflet/dist/leaflet.css';
 import type { LatLngExpression, LatLngBoundsExpression } from 'leaflet';
@@ -120,6 +120,97 @@ function FlyTo({ center, zoom }: { center: [number, number]; zoom: number }) {
   return null;
 }
 
+function LocateButton({ onLocate }: { onLocate: (lat: number, lng: number) => void }) {
+  const [locating, setLocating] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  function handleLocate() {
+    if (!navigator.geolocation) {
+      setError('Géolocalisation non supportée');
+      return;
+    }
+    setLocating(true);
+    setError(null);
+    navigator.geolocation.getCurrentPosition(
+      (pos) => {
+        setLocating(false);
+        onLocate(pos.coords.latitude, pos.coords.longitude);
+      },
+      () => {
+        setLocating(false);
+        setError('Position refusée');
+        setTimeout(() => setError(null), 3000);
+      },
+      { enableHighAccuracy: true, timeout: 10000 }
+    );
+  }
+
+  return (
+    <div className="relative">
+      <button
+        onClick={handleLocate}
+        disabled={locating}
+        className="p-1.5 rounded-lg border border-gray-200 bg-white hover:bg-gray-50 transition-colors disabled:opacity-50"
+        title="Ma position"
+        aria-label="Trouver ma position"
+      >
+        {locating ? (
+          <svg className="w-4 h-4 animate-spin text-gray-500" fill="none" viewBox="0 0 24 24">
+            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+          </svg>
+        ) : (
+          <svg className="w-4 h-4 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-2.21 0-4 1.79-4 4s1.79 4 4 4 4-1.79 4-4-1.79-4-4-4z" />
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 2v2m0 16v2m10-10h-2M4 12H2" />
+          </svg>
+        )}
+      </button>
+      {error && (
+        <span className="absolute top-full left-0 mt-1 whitespace-nowrap text-xs text-red-500 bg-white rounded px-1.5 py-0.5 shadow-sm border border-red-100">
+          {error}
+        </span>
+      )}
+    </div>
+  );
+}
+
+function MobileLegend() {
+  const [open, setOpen] = useState(false);
+
+  return (
+    <div className="sm:hidden relative">
+      <button
+        onClick={() => setOpen(!open)}
+        className="p-1.5 rounded-lg border border-gray-200 bg-white hover:bg-gray-50 transition-colors"
+        title="Légende"
+        aria-label="Afficher la légende des couleurs"
+      >
+        <svg className="w-4 h-4 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+        </svg>
+      </button>
+      {open && (
+        <>
+          <div className="fixed inset-0 z-40" onClick={() => setOpen(false)} />
+          <div className="absolute right-0 top-full mt-1 bg-white border border-gray-200 rounded-lg shadow-lg z-50 p-3 min-w-[140px]">
+            <p className="text-xs font-semibold text-gray-500 mb-2">Légende</p>
+            {[1, 2, 3, 4].map((etat) => {
+              const m = STATUS_META[etat];
+              return (
+                <div key={etat} className="flex items-center gap-2 py-0.5">
+                  <span className="w-5 h-1.5 rounded flex-shrink-0" style={{ backgroundColor: STATUS_COLORS[etat] }} />
+                  <span className="text-gray-700 text-xs">{m.label}</span>
+                </div>
+              );
+            })}
+          </div>
+        </>
+      )}
+    </div>
+  );
+}
+
 interface SearchResult {
   nom_voie: string;
   type_voie: string | null;
@@ -147,6 +238,7 @@ export default function MapView() {
   const [selectedStreet, setSelectedStreet] = useState<string | null>(streetParam);
   const searchTimerRef = useRef<ReturnType<typeof setTimeout>>();
   const searchAbortRef = useRef<AbortController>();
+  const [userLocation, setUserLocation] = useState<[number, number] | null>(null);
   const isStreetMode = !!streetParam || !!selectedStreet;
 
   const initialCenter = CITY_CENTERS[cityParam] ?? CITY_CENTERS.montreal;
@@ -246,6 +338,12 @@ export default function MapView() {
     setFlyTarget({ center: CITY_CENTERS[cityId] ?? CITY_CENTERS.montreal, zoom: 13 });
   }
 
+  function handleLocate(lat: number, lng: number) {
+    setUserLocation([lat, lng]);
+    setSelectedStreet(null);
+    setFlyTarget({ center: [lat, lng], zoom: 16 });
+  }
+
   return (
     <div className="flex flex-col h-[calc(100vh-3.5rem)]">
       {/* Toolbar */}
@@ -259,6 +357,7 @@ export default function MapView() {
                 onClick={clearSearch}
                 className="p-0.5 hover:bg-brand-primary/20 rounded"
                 title="Effacer"
+                aria-label="Effacer la recherche"
               >
                 <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
@@ -274,6 +373,7 @@ export default function MapView() {
                 onFocus={() => searchResults.length > 0 && setSearchOpen(true)}
                 onBlur={() => setTimeout(() => setSearchOpen(false), 200)}
                 placeholder="Chercher une rue..."
+                aria-label="Rechercher une rue"
                 className="w-44 sm:w-56 pl-3 pr-2 py-1 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-brand-primary focus:border-transparent"
               />
               {searchOpen && searchResults.length > 0 && (
@@ -330,9 +430,12 @@ export default function MapView() {
             ))}
           </div>
 
+          {/* Locate me */}
+          <LocateButton onLocate={handleLocate} />
+
           {loading && <span className="text-gray-400 ml-1">...</span>}
 
-          {/* Legend */}
+          {/* Desktop legend */}
           <div className="ml-auto hidden sm:flex items-center gap-3">
             {[1, 2, 3, 4].map((etat) => {
               const m = STATUS_META[etat];
@@ -343,6 +446,11 @@ export default function MapView() {
                 </div>
               );
             })}
+          </div>
+
+          {/* Mobile legend */}
+          <div className="ml-auto sm:ml-0">
+            <MobileLegend />
           </div>
         </div>
       </div>
@@ -365,6 +473,17 @@ export default function MapView() {
           <MapEvents onBoundsChange={fetchMapSegments} />
           {flyTarget && <FlyTo center={flyTarget.center} zoom={flyTarget.zoom} />}
           <SegmentLayer segments={segments} cityId={cityId} />
+          {userLocation && (
+            <CircleMarker
+              center={userLocation}
+              radius={8}
+              pathOptions={{ color: '#3B82F6', fillColor: '#3B82F6', fillOpacity: 0.9, weight: 3 }}
+            >
+              <Popup>
+                <span className="text-sm font-medium">Votre position</span>
+              </Popup>
+            </CircleMarker>
+          )}
         </MapContainer>
       </div>
     </div>
