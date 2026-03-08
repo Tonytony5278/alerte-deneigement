@@ -146,6 +146,7 @@ export default function MapView() {
   const [searchOpen, setSearchOpen] = useState(false);
   const [selectedStreet, setSelectedStreet] = useState<string | null>(streetParam);
   const searchTimerRef = useRef<ReturnType<typeof setTimeout>>();
+  const searchAbortRef = useRef<AbortController>();
   const isStreetMode = !!streetParam || !!selectedStreet;
 
   const initialCenter = CITY_CENTERS[cityParam] ?? CITY_CENTERS.montreal;
@@ -200,20 +201,23 @@ export default function MapView() {
   function handleSearch(text: string) {
     setSearchQuery(text);
     clearTimeout(searchTimerRef.current);
+    searchAbortRef.current?.abort();
     if (text.length < 2) {
       setSearchResults([]);
       setSearchOpen(false);
       return;
     }
     searchTimerRef.current = setTimeout(async () => {
+      const ctrl = new AbortController();
+      searchAbortRef.current = ctrl;
       try {
-        const res = await fetch(`${API_BASE}/api/streets/search-grouped?q=${encodeURIComponent(text)}&limit=5`);
+        const res = await fetch(`${API_BASE}/api/streets/search-grouped?q=${encodeURIComponent(text)}&limit=5`, { signal: ctrl.signal });
         if (!res.ok) return;
         const json = await res.json();
         setSearchResults(json.data ?? []);
         setSearchOpen(true);
-      } catch { /* ignore */ }
-    }, 250);
+      } catch { /* aborted or network error */ }
+    }, 150);
   }
 
   function selectSearchResult(r: SearchResult) {

@@ -47,6 +47,10 @@ const SearchQuerySchema = z.object({
   limit: z.coerce.number().int().min(1).max(50).default(15),
 });
 
+// Common Quebec street type prefixes to strip from search queries.
+// Users type "boul saint-laurent" but nom_voie is just "Saint-Laurent".
+const STREET_TYPE_PREFIXES = /^(?:rue|r\.|boul|boulevard|blvd|bl\.|av|ave|avenue|ch|chemin|pl|place|côte|cote|montée|montee|mont|rang|rte|route|cr|croissant|imp|impasse|allée|allee|all)\b\.?\s*/i;
+
 const NearbyQuerySchema = z.object({
   lat: z.coerce.number().min(44).max(48),
   lng: z.coerce.number().min(-76).max(-71),
@@ -86,7 +90,9 @@ export async function streetsRoutes(app: FastifyInstance) {
     const leadingNum = q.match(/^(\d+)\s+(.*)/);
     const trailingNum = q.match(/^(.*?)\s+(\d+)$/);
     const addressNum = leadingNum ? Number(leadingNum[1]) : trailingNum ? Number(trailingNum[2]) : null;
-    const searchTerm = leadingNum ? leadingNum[2] : trailingNum ? trailingNum[1] : q;
+    const rawTerm = leadingNum ? leadingNum[2] : trailingNum ? trailingNum[1] : q;
+    // Strip street type prefix: "boul saint-laurent" → "saint-laurent"
+    const searchTerm = rawTerm.replace(STREET_TYPE_PREFIXES, '').trim() || rawTerm;
 
     const worstEtatExpr = `COALESCE(
       MAX(CASE WHEN COALESCE(os.etat, 0) = 3 THEN 3 END),
@@ -270,7 +276,9 @@ export async function streetsRoutes(app: FastifyInstance) {
     // Quick existence check (LIMIT 1 is instant vs COUNT(*) which scans entire FTS table)
     const ftsAvailable = !!(db.prepare('SELECT rowid FROM street_segments_fts LIMIT 1').get());
 
-    const numMatch = q.match(/^(\d+)\s+(.*)/);
+    // Strip street type prefix from query
+    const cleanQ = q.replace(STREET_TYPE_PREFIXES, '').trim() || q;
+    const numMatch = cleanQ.match(/^(\d+)\s+(.*)/);
     let rows;
 
     if (numMatch) {
@@ -320,7 +328,7 @@ export async function streetsRoutes(app: FastifyInstance) {
     } else {
       if (ftsAvailable) {
         // FTS search — append * for prefix matching
-        const ftsQuery = `"${q.replace(/"/g, '""')}"*`;
+        const ftsQuery = `"${cleanQ.replace(/"/g, '""')}"*`;
         const sql = `SELECT s.id, s.city_id, s.nom_voie, s.type_voie, s.debut_adresse, s.fin_adresse,
                     s.cote, s.arrondissement, s.lat, s.lng,
                     os.etat, os.date_deb_planif, os.date_fin_planif, os.updated_at
@@ -349,7 +357,7 @@ export async function streetsRoutes(app: FastifyInstance) {
              LIMIT @limit`;
         rows = db.prepare(sql).all({
           ...(filterCity ? { cityId } : {}),
-          pattern: `%${q}%`,
+          pattern: `%${cleanQ}%`,
           limit,
         });
       }

@@ -11,27 +11,36 @@ export function SearchSection() {
   const [searched, setSearched] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const timerRef = useRef<ReturnType<typeof setTimeout>>();
+  const abortRef = useRef<AbortController>();
 
   const handleChange = useCallback((text: string) => {
     setQuery(text);
     setError(null);
     clearTimeout(timerRef.current);
+    abortRef.current?.abort();
+
     if (text.length < 2) {
       setResults([]);
       setSearched(false);
+      setLoading(false);
       return;
     }
     setLoading(true);
     timerRef.current = setTimeout(async () => {
+      const ctrl = new AbortController();
+      abortRef.current = ctrl;
       try {
-        const result = await searchStreetsGrouped(text);
+        const result = await searchStreetsGrouped(text, 10, ctrl.signal);
         setResults(result.data);
         setError(result.error ?? null);
         setSearched(true);
+      } catch {
+        // aborted — ignore
+        return;
       } finally {
-        setLoading(false);
+        if (!ctrl.signal.aborted) setLoading(false);
       }
-    }, 300);
+    }, 150);
   }, []);
 
   return (
@@ -54,7 +63,7 @@ export function SearchSection() {
           type="text"
           value={query}
           onChange={(e) => handleChange(e.target.value)}
-          placeholder="Ex: Fullum, Saint-Denis, Boul. Laurier..."
+          placeholder="Ex: Fullum, 4523 Saint-Denis, Boul. Laurier..."
           className="w-full pl-10 pr-4 py-3 border border-gray-200 rounded-xl text-base focus:outline-none focus:ring-2 focus:ring-brand-primary focus:border-transparent shadow-sm"
         />
       </div>

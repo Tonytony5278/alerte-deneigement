@@ -106,16 +106,17 @@ export async function getCities(): Promise<CityConfig[]> {
   return json.data;
 }
 
-export async function searchStreetsGrouped(q: string, limit = 10): Promise<{ data: GroupedStreetResult[]; error?: string }> {
+export async function searchStreetsGrouped(q: string, limit = 10, signal?: AbortSignal): Promise<{ data: GroupedStreetResult[]; error?: string }> {
   try {
     const res = await fetch(
       `${API_BASE}/api/streets/search-grouped?q=${encodeURIComponent(q)}&limit=${limit}`,
-      { cache: 'no-store' }
+      { cache: 'no-store', signal }
     );
     if (!res.ok) return { data: [], error: `Erreur serveur (${res.status})` };
     const json = await res.json() as { data: GroupedStreetResult[] };
     return { data: json.data };
-  } catch {
+  } catch (e) {
+    if (e instanceof DOMException && e.name === 'AbortError') throw e;
     return { data: [], error: 'Impossible de joindre le serveur.' };
   }
 }
