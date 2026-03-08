@@ -1,10 +1,12 @@
 import type { Metadata } from 'next';
+import Image from 'next/image';
 import { Analytics } from './components/Analytics';
 import './globals.css';
 
 export const metadata: Metadata = {
   icons: {
-    icon: '/favicon.svg',
+    icon: '/logo.png',
+    apple: '/logo.png',
   },
   manifest: '/manifest.json',
   title: 'Alerte Neige — Déneigement gratuit pour le Québec',
@@ -35,7 +37,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         <header className="sticky top-0 z-50 bg-white border-b border-gray-100 shadow-sm">
           <div className="max-w-4xl mx-auto px-4 h-14 flex items-center justify-between">
             <a href="/" className="flex items-center gap-2 font-bold text-lg text-brand-primary">
-              <span className="text-2xl">❄️</span>
+              <Image src="/logo.png" alt="Alerte Neige" width={32} height={32} className="rounded-lg" />
               <span>Alerte Neige</span>
             </a>
             <nav className="flex items-center gap-4 text-sm font-medium text-gray-600">

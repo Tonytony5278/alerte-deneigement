@@ -103,6 +103,9 @@ export async function streetsRoutes(app: FastifyInstance) {
       0
     )`;
 
+    // Exclude placeholder segment names (e.g. "Segment Longueuil #14479")
+    const excludePlaceholder = "AND s.nom_voie NOT LIKE 'Segment %'";
+
     let rows;
     if (ftsAvailable) {
       const ftsQuery = `"${searchTerm.replace(/"/g, '""')}"*`;
@@ -119,8 +122,9 @@ export async function streetsRoutes(app: FastifyInstance) {
         LEFT JOIN operation_statuses os ON os.segment_id = s.id
         WHERE fts.nom_voie MATCH @ftsQuery
           ${filterCity ? 'AND s.city_id = @cityId' : ''}
+          ${excludePlaceholder}
         GROUP BY s.nom_voie, s.city_id
-        ORDER BY MIN(rank)
+        ORDER BY COUNT(*) DESC, MIN(rank)
         LIMIT @limit
       `).all({ ftsQuery, ...(filterCity ? { cityId } : {}), limit });
     } else {
@@ -136,8 +140,9 @@ export async function streetsRoutes(app: FastifyInstance) {
         LEFT JOIN operation_statuses os ON os.segment_id = s.id
         WHERE ${filterCity ? 's.city_id = @cityId AND' : ''}
           s.nom_voie LIKE @pattern COLLATE NOCASE
+          ${excludePlaceholder}
         GROUP BY s.nom_voie, s.city_id
-        ORDER BY s.nom_voie
+        ORDER BY COUNT(*) DESC, s.nom_voie
         LIMIT @limit
       `).all({ ...(filterCity ? { cityId } : {}), pattern: `%${searchTerm}%`, limit });
     }
@@ -279,6 +284,7 @@ export async function streetsRoutes(app: FastifyInstance) {
     // Strip street type prefix from query
     const cleanQ = q.replace(STREET_TYPE_PREFIXES, '').trim() || q;
     const numMatch = cleanQ.match(/^(\d+)\s+(.*)/);
+    const noPlaceholder = "AND s.nom_voie NOT LIKE 'Segment %'";
     let rows;
 
     if (numMatch) {
@@ -295,6 +301,7 @@ export async function streetsRoutes(app: FastifyInstance) {
              LEFT JOIN operation_statuses os ON os.segment_id = s.id
              WHERE fts.nom_voie MATCH @ftsQuery
                ${filterCity ? 'AND s.city_id = @cityId' : ''}
+               ${noPlaceholder}
                AND (s.debut_adresse IS NULL OR s.debut_adresse <= @num)
                AND (s.fin_adresse IS NULL OR s.fin_adresse >= @num)
              ORDER BY rank
@@ -314,6 +321,7 @@ export async function streetsRoutes(app: FastifyInstance) {
              LEFT JOIN operation_statuses os ON os.segment_id = s.id
              WHERE ${filterCity ? 's.city_id = @cityId AND' : ''}
                s.nom_voie LIKE @pattern COLLATE NOCASE
+               ${noPlaceholder}
                AND (s.debut_adresse IS NULL OR s.debut_adresse <= @num)
                AND (s.fin_adresse IS NULL OR s.fin_adresse >= @num)
              ORDER BY s.nom_voie
@@ -337,6 +345,7 @@ export async function streetsRoutes(app: FastifyInstance) {
              LEFT JOIN operation_statuses os ON os.segment_id = s.id
              WHERE fts.nom_voie MATCH @ftsQuery
                ${filterCity ? 'AND s.city_id = @cityId' : ''}
+               ${noPlaceholder}
              ORDER BY rank
              LIMIT @limit`;
         rows = db.prepare(sql).all({
@@ -353,6 +362,7 @@ export async function streetsRoutes(app: FastifyInstance) {
              LEFT JOIN operation_statuses os ON os.segment_id = s.id
              WHERE ${filterCity ? 's.city_id = @cityId AND' : ''}
                s.nom_voie LIKE @pattern COLLATE NOCASE
+               ${noPlaceholder}
              ORDER BY s.nom_voie
              LIMIT @limit`;
         rows = db.prepare(sql).all({
@@ -506,7 +516,7 @@ export async function streetsRoutes(app: FastifyInstance) {
     const rows = db.prepare(`
       SELECT nom_voie, city_id
       FROM street_segments
-      WHERE nom_voie IS NOT NULL AND nom_voie != ''
+      WHERE nom_voie IS NOT NULL AND nom_voie != '' AND nom_voie NOT LIKE 'Segment %'
       GROUP BY nom_voie, city_id
       ORDER BY city_id, nom_voie
     `).all() as { nom_voie: string; city_id: string }[];
