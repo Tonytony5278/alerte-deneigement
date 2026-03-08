@@ -2,7 +2,12 @@
 
 import { MapContainer, TileLayer, Polyline, Popup } from 'react-leaflet';
 import 'leaflet/dist/leaflet.css';
-import type { LatLngExpression } from 'leaflet';
+import type { LatLngExpression, LatLngBoundsExpression } from 'leaflet';
+
+const QUEBEC_BOUNDS: LatLngBoundsExpression = [
+  [44.8, -76.5],
+  [47.5, -70.5],
+];
 
 const STATUS_COLORS: Record<number, string> = {
   0: '#94A3B8',
@@ -36,6 +41,9 @@ export default function StreetMap({ segments, center, zoom = 15, height = '400px
     <MapContainer
       center={center}
       zoom={zoom}
+      minZoom={10}
+      maxBounds={QUEBEC_BOUNDS}
+      maxBoundsViscosity={1.0}
       style={{ height, width: '100%' }}
       className="rounded-xl z-0"
     >

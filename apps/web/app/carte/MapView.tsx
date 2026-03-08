@@ -462,7 +462,7 @@ export default function MapView() {
           zoom={isStreetMode ? 15 : 13}
           minZoom={10}
           maxBounds={QUEBEC_BOUNDS}
-          maxBoundsViscosity={0.8}
+          maxBoundsViscosity={1.0}
           style={{ height: '100%', width: '100%' }}
           className="z-0"
         >
